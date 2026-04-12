@@ -1,6 +1,4 @@
 # Nazar-AI - AI-Powered Security Surveillance
-
-![Gif 1](public/gifs/landing.gif)
 ![Gif 2](public/gifs/gallary.gif)
 ## Inspiration
 In an era where security cameras are everywhere but meaningful surveillance is scarce, we saw an opportunity to transform passive recording systems into intelligent security guardians. Our inspiration came from real-world incidents where crucial moments were missed despite having camera coverage, and the overwhelming challenge security personnel face in monitoring multiple video feeds simultaneously. We wanted to create a solution that doesn't just record but understands, analyzes, and acts, whether it's for local businesses like grocery markets to bigger organizations like hospitals and shopping malls.
