@@ -430,26 +430,6 @@ const filterResult = frameFilter.evaluate(
   }
 )
 
-
-    ;(window as any).__nazarStats ??= {
-      filterChecks: 0,
-      blocked: 0,
-      gptCalls: 0
-    }
-
-    ;(window as any).__nazarStats.filterChecks++
-
-    console.log(
-      "[FILTER]",
-      {
-        send: filterResult.send,
-        score: filterResult.score,
-        reason: filterResult.reason,
-        debug: filterResult.debug
-      }
-    )
-
-
 console.log("Frame Filter:", filterResult)
 
 // Skip GPT call

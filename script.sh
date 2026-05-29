@@ -1,3 +1,4 @@
+cat > /home/claude/page.tsx << 'ENDOFFILE'
 "use client"
 import { frameFilter } from '@/lib/frame-filter'
 import type React from "react"
@@ -12,7 +13,6 @@ import { Timeline } from "../../components/Timeline"
 import type { Timestamp } from "@/app/types"
 import { detectEvents, type VideoEvent, type TensorFlowData } from "./actions"
 
-// Dynamically import TensorFlow.js and models
 import { loadTensorFlowModules, isTensorFlowReady, type TensorFlowModules } from '@/lib/tensorflow-loader'
 import type * as blazeface from '@tensorflow-models/blazeface'
 import type * as posedetection from '@tensorflow-models/pose-detection'
@@ -57,7 +57,6 @@ export default function Page() {
   const [videoName, setVideoName] = useState('')
   const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null)
   const [mlModelsReady, setMlModelsReady] = useState(false)
-  const [lastPoseKeypoints, setLastPoseKeypoints] = useState<Keypoint[]>([])
   const [isClient, setIsClient] = useState(false)
 
   // Refs
@@ -76,36 +75,44 @@ export default function Page() {
   const recordedChunksRef = useRef<Blob[]>([])
   const isRecordingRef = useRef<boolean>(false)
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // FIX: All mutable data used inside RAF loops and async callbacks must be refs, not state
+  const mlModelsReadyRef = useRef<boolean>(false)
+  const currentPoseKeypointsRef = useRef<Keypoint[]>([])
   const prevPoseKeypointsRef = useRef<Keypoint[] | null>(null)
+  const currentFaceDetectedRef = useRef<boolean>(false)
+  const currentFaceConfidenceRef = useRef<number | undefined>(undefined)
+  const transcriptRef = useRef<string>('')
+
+  // Keep transcriptRef in sync with transcript state
+  useEffect(() => {
+    transcriptRef.current = transcript
+  }, [transcript])
+
   // -----------------------------
   // 1) Initialize ML Models
   // -----------------------------
   const initMLModels = async () => {
-    // Only run on client side
-    if (typeof window === 'undefined') {
-      return
-    }
-    
+    if (typeof window === 'undefined') return
+
     try {
       setIsInitializing(true)
+      mlModelsReadyRef.current = false
       setMlModelsReady(false)
       setError(null)
 
       setInitializationProgress('Loading TensorFlow.js modules...')
-      
-      // Load TensorFlow modules using the utility
       tfModules = await loadTensorFlowModules()
-      
+
       if (!tfModules) {
         throw new Error('Failed to load TensorFlow.js modules')
       }
 
-      // Load models in parallel
       setInitializationProgress('Initializing AI models...')
       const [faceModel, poseModel] = await Promise.all([
         tfModules.blazefaceModel.load({
-          maxFaces: 1, // Limit to 1 face for better performance
-          scoreThreshold: 0.5 // Increase threshold for better performance
+          maxFaces: 1,
+          scoreThreshold: 0.5
         }),
         tfModules.poseDetection.createDetector(
           tfModules.poseDetection.SupportedModels.MoveNet,
@@ -120,23 +127,24 @@ export default function Page() {
       faceModelRef.current = faceModel
       poseModelRef.current = poseModel
 
+      mlModelsReadyRef.current = true
       setMlModelsReady(true)
       setIsInitializing(false)
       console.log('All ML models loaded successfully')
     } catch (err) {
       console.error('Error loading ML models:', err)
       setError('Failed to load ML models: ' + (err as Error).message)
+      mlModelsReadyRef.current = false
       setMlModelsReady(false)
       setIsInitializing(false)
     }
   }
 
-  // Helper to set canvas dimensions
   const updateCanvasSize = () => {
     if (!videoRef.current || !canvasRef.current) return
     const canvas = canvasRef.current
-    canvas.width = 640 // fixed width
-    canvas.height = 360 // fixed height (16:9)
+    canvas.width = 640
+    canvas.height = 360
   }
 
   // -----------------------------
@@ -157,7 +165,6 @@ export default function Page() {
         videoRef.current.srcObject = stream
         mediaStreamRef.current = stream
 
-        // Wait for video metadata so we can set the canvas size
         await new Promise<void>((resolve) => {
           videoRef.current!.onloadedmetadata = () => {
             updateCanvasSize()
@@ -167,9 +174,7 @@ export default function Page() {
       }
     } catch (error) {
       console.error("Error accessing webcam:", error)
-      setError(
-        "Failed to access webcam. Please make sure you have granted camera permissions."
-      )
+      setError("Failed to access webcam. Please make sure you have granted camera permissions.")
     }
   }
 
@@ -218,17 +223,17 @@ export default function Page() {
 
   // -----------------------------
   // 4) TensorFlow detection loop
+  // FIX: Use refs throughout — no stale closures
   // -----------------------------
   const runDetection = async () => {
     if (!isRecordingRef.current) return
 
-    // Check if ML models are ready before proceeding
-    if (!mlModelsReady || !faceModelRef.current || !poseModelRef.current) {
+    // FIX: Read from ref, not state — state is always stale inside RAF
+    if (!mlModelsReadyRef.current || !faceModelRef.current || !poseModelRef.current) {
       detectionFrameRef.current = requestAnimationFrame(runDetection)
       return
     }
 
-    // Throttle detection to ~10 FPS (every 100ms)
     const now = performance.now()
     if (now - lastDetectionTime.current < 100) {
       detectionFrameRef.current = requestAnimationFrame(runDetection)
@@ -249,37 +254,32 @@ export default function Page() {
       return
     }
 
-    // Clear canvas and draw current video frame
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     drawVideoToCanvas(video, canvas, ctx)
 
-    // Scale for drawing predictions
     const scaleX = canvas.width / video.videoWidth
     const scaleY = canvas.height / video.videoHeight
 
-    // Face detection
+    // Face detection — write result to ref for analyzeFrame to consume
     if (faceModelRef.current) {
       try {
         const predictions = await faceModelRef.current.estimateFaces(video, false)
+        currentFaceDetectedRef.current = predictions.length > 0
+        currentFaceConfidenceRef.current = predictions.length > 0
+          ? (predictions[0].probability as number)
+          : undefined
+
         predictions.forEach((prediction: blazeface.NormalizedFace) => {
           const start = prediction.topLeft as [number, number]
           const end = prediction.bottomRight as [number, number]
           const size = [end[0] - start[0], end[1] - start[1]]
-
           const scaledStart = [start[0] * scaleX, start[1] * scaleY]
           const scaledSize = [size[0] * scaleX, size[1] * scaleX]
 
-          // Draw bounding box
           ctx.strokeStyle = "rgba(0, 255, 0, 0.8)"
           ctx.lineWidth = 2
-          ctx.strokeRect(
-            scaledStart[0],
-            scaledStart[1],
-            scaledSize[0],
-            scaledSize[1]
-          )
+          ctx.strokeRect(scaledStart[0], scaledStart[1], scaledSize[0], scaledSize[1])
 
-          // Draw confidence
           const confidence = Math.round((prediction.probability as number) * 100)
           ctx.fillStyle = "white"
           ctx.font = "16px Arial"
@@ -290,44 +290,39 @@ export default function Page() {
       }
     }
 
-    // Pose detection
+    // Pose detection — write result to ref for analyzeFrame to consume
     if (poseModelRef.current) {
       try {
         const poses = await poseModelRef.current.estimatePoses(video)
         if (poses.length > 0) {
           const keypoints = poses[0].keypoints
-          // Convert TF keypoints to our Keypoint type
           const convertedKeypoints: Keypoint[] = keypoints.map(kp => ({
             x: kp.x,
             y: kp.y,
-            score: kp.score ?? 0, // Use 0 as default if score is undefined
+            score: kp.score ?? 0,
             name: kp.name
           }))
-          prevPoseKeypointsRef.current = lastPoseKeypoints
 
-   setLastPoseKeypoints(convertedKeypoints)
+          // FIX: Update prev before updating current, both via refs only
+          prevPoseKeypointsRef.current = currentPoseKeypointsRef.current
+          currentPoseKeypointsRef.current = convertedKeypoints
 
           keypoints.forEach((keypoint) => {
-            // Use nullish coalescing to provide a default value of 0
             if ((keypoint.score ?? 0) > 0.3) {
               const x = keypoint.x * scaleX
               const y = keypoint.y * scaleY
 
-              // Draw keypoint
               ctx.beginPath()
               ctx.arc(x, y, 4, 0, 2 * Math.PI)
               ctx.fillStyle = "rgba(255, 0, 0, 0.8)"
               ctx.fill()
 
-              // Outer circle
               ctx.beginPath()
               ctx.arc(x, y, 6, 0, 2 * Math.PI)
               ctx.strokeStyle = "white"
               ctx.lineWidth = 1.5
               ctx.stroke()
 
-              // Label (if available)
-              // Use nullish coalescing to provide a default value of 0
               if ((keypoint.score ?? 0) > 0.5 && keypoint.name) {
                 ctx.fillStyle = "white"
                 ctx.font = "12px Arial"
@@ -341,13 +336,10 @@ export default function Page() {
       }
     }
 
-    // (Optional) Compute FPS
     lastFrameTimeRef.current = performance.now()
-
     detectionFrameRef.current = requestAnimationFrame(runDetection)
   }
 
-  // Helper: Draw video to canvas (maintaining aspect ratio)
   const drawVideoToCanvas = (
     video: HTMLVideoElement,
     canvas: HTMLCanvasElement,
@@ -373,13 +365,38 @@ export default function Page() {
   }
 
   // -----------------------------
-  // 5) Analyze frame via API (and send email if dangerous)
+  // 5) Analyze frame via API
+  // FIX: Read all live data from refs, not stale state closures
   // -----------------------------
   const analyzeFrame = async () => {
     if (!isRecordingRef.current) return
 
-    const currentTranscript = transcript.trim()
-    const currentPoseKeypoints = [...lastPoseKeypoints]
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    // FIX: Read from refs — these are always current
+    const currentTranscript = transcriptRef.current.trim()
+    const poseKeypoints = currentPoseKeypointsRef.current
+    const faceDetected = currentFaceDetectedRef.current
+    const faceConfidence = currentFaceConfidenceRef.current
+
+    // FIX: Run frame filter BEFORE capturing a separate frame
+    // The canvas already has the latest frame drawn by runDetection
+    const filterResult = frameFilter.evaluate(
+      canvas,
+      {
+        poseKeypoints,
+        prevPoseKeypoints: prevPoseKeypointsRef.current,
+        faceDetected,
+        faceConfidence,
+        transcript: currentTranscript,
+        frameHeight: canvas.height
+      }
+    )
+
+    console.log("Frame Filter:", filterResult)
+
+    if (!filterResult.send) return
 
     try {
       const frame = await captureFrame()
@@ -390,195 +407,101 @@ export default function Page() {
         return
       }
 
-      // Build TensorFlow data for enhanced Gemini analysis
       const tensorflowData: TensorFlowData = {
-        poseKeypoints: currentPoseKeypoints,
-        faceDetected: faceModelRef.current !== null && currentPoseKeypoints.length > 0,
-        faceConfidence: undefined // Will be set if face is detected
+        poseKeypoints,
+        faceDetected,
+        faceConfidence
       }
 
-      // Check face detection status
-      if (faceModelRef.current && videoRef.current) {
-        try {
-          const predictions = await faceModelRef.current.estimateFaces(videoRef.current, false)
-          tensorflowData.faceDetected = predictions.length > 0
-          if (predictions.length > 0) {
-            tensorflowData.faceConfidence = predictions[0].probability as number
-          }
-        } catch (e) {
-          // Face detection failed, keep defaults
-        }
-      }
+      console.log('Sending frame to GPT — filter score:', filterResult.score, 'reason:', filterResult.reason)
 
-      console.log('📊 TensorFlow data:', {
-        poseKeypoints: currentPoseKeypoints.length,
-        faceDetected: tensorflowData.faceDetected,
-        faceConfidence: tensorflowData.faceConfidence
-      })
+      const result = await detectEvents(frame, currentTranscript, tensorflowData)
 
-if (!canvasRef.current) return
+      if (!isRecordingRef.current) return
 
-const filterResult = frameFilter.evaluate(
-  canvasRef.current,
-  {
-    poseKeypoints: tensorflowData.poseKeypoints,
-    prevPoseKeypoints: prevPoseKeypointsRef.current,
-    faceDetected: tensorflowData.faceDetected,
-    faceConfidence: tensorflowData.faceConfidence,
-    transcript: currentTranscript,
-    frameHeight: canvasRef.current.height
-  }
-)
-
-
-    ;(window as any).__nazarStats ??= {
-      filterChecks: 0,
-      blocked: 0,
-      gptCalls: 0
-    }
-
-    ;(window as any).__nazarStats.filterChecks++
-
-    console.log(
-      "[FILTER]",
-      {
-        send: filterResult.send,
-        score: filterResult.score,
-        reason: filterResult.reason,
-        debug: filterResult.debug
-      }
-    )
-
-
-console.log("Frame Filter:", filterResult)
-
-// Skip GPT call
-if (!filterResult.send) {
-  return
-}
-
-const result = await detectEvents(
-  frame,
-  currentTranscript,
-  tensorflowData
-)
-
-if (!isRecordingRef.current) return
-
-      // Add null/undefined check for result
       if (!result || !result.events) {
         console.warn("No events returned from detectEvents")
         return
       }
 
       if (result.events.length > 0) {
-        // Use for...of instead of forEach for proper async handling
         for (const event of result.events) {
           const newTimestamp = {
             timestamp: getElapsedTime(),
             description: event.description,
             isDangerous: event.isDangerous
           }
-          
-          console.log("Adding new timestamp:", newTimestamp)
-          setTimestamps((prev) => {
-            console.log("Previous timestamps:", prev.length, "Adding:", newTimestamp.description)
-            return [...prev, newTimestamp]
-          })
 
-          // For dangerous events, send notifications (email + Telegram)
+          console.log("Adding new timestamp:", newTimestamp)
+          setTimestamps((prev) => [...prev, newTimestamp])
+
           if (event.isDangerous) {
-            console.log("🚨 DANGEROUS EVENT DETECTED - Sending notifications...")
+            console.log("DANGEROUS EVENT DETECTED — Sending notifications...")
             const notificationPayload = {
               title: "Dangerous Activity Detected",
               description: `At ${newTimestamp.timestamp}, the following dangerous activity was detected: ${event.description}`,
               timestamp: newTimestamp.timestamp,
-              imageBase64: frame // Include the captured frame
+              imageBase64: frame
             }
 
-            // Send Telegram notification with image
             try {
-              console.log("📱 Sending Telegram notification...")
               const telegramResponse = await fetch("/api/send-telegram", {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json"
-                },
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
                 body: JSON.stringify(notificationPayload)
               })
-              
               if (telegramResponse.ok) {
-                console.log("✅ Telegram notification sent successfully")
+                console.log("Telegram notification sent successfully")
               } else {
                 const telegramError = await telegramResponse.json()
-                console.error("❌ Failed to send Telegram notification:", telegramError)
+                console.error("Failed to send Telegram notification:", telegramError)
               }
             } catch (telegramError) {
-              console.error("❌ Error sending Telegram notification:", telegramError)
+              console.error("Error sending Telegram notification:", telegramError)
             }
 
-            // Send WhatsApp notification
             try {
-              console.log("💬 Sending WhatsApp notification...")
               const whatsappResponse = await fetch("/api/send-whatsapp", {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json"
-                },
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
                 body: JSON.stringify(notificationPayload)
               })
-
               if (whatsappResponse.ok) {
-                console.log("✅ WhatsApp notification sent successfully")
+                console.log("WhatsApp notification sent successfully")
               } else {
                 const whatsappError = await whatsappResponse.json()
-                console.error("❌ Failed to send WhatsApp notification:", whatsappError)
+                console.error("Failed to send WhatsApp notification:", whatsappError)
               }
             } catch (whatsappError) {
-              console.error("❌ Error sending WhatsApp notification:", whatsappError)
+              console.error("Error sending WhatsApp notification:", whatsappError)
             }
 
-            // Send email notification
             try {
-              console.log("📧 Sending email notification...")
               const emailPayload = {
                 title: notificationPayload.title,
                 description: notificationPayload.description
               }
               const response = await fetch("/api/send-email", {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json"
-                },
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
                 body: JSON.stringify(emailPayload)
               })
-              
-              // Check if response is ok before trying to parse JSON
+
               if (!response.ok) {
                 if (response.status === 401) {
-                  setError(
-                    "Please sign in to receive email notifications for dangerous events."
-                  )
+                  setError("Please sign in to receive email notifications for dangerous events.")
                 } else if (response.status === 500) {
-                  setError(
-                    "Email service not properly configured. Please contact support."
-                  )
+                  setError("Email service not properly configured. Please contact support.")
                 } else {
                   const errorText = await response.text()
                   console.error("Failed to send email notification:", errorText)
-                  setError(
-                    `Failed to send email notification. Please try again later.`
-                  )
+                  setError("Failed to send email notification. Please try again later.")
                 }
-                continue // Continue to next event instead of return
+                continue
               }
-              
-              // Only try to parse JSON for successful responses
+
               const resData = await response.json()
-              console.log("✅ Email notification sent successfully:", resData)
+              console.log("Email notification sent successfully:", resData)
             } catch (error) {
               console.error("Error sending email notification:", error)
             }
@@ -595,25 +518,22 @@ if (!isRecordingRef.current) return
   }
 
   // -----------------------------
-  // 6) Capture current video frame (for analysis)
+  // 6) Capture current video frame
   // -----------------------------
   const captureFrame = async (): Promise<string | null> => {
     if (!videoRef.current) return null
 
     const video = videoRef.current
     const tempCanvas = document.createElement("canvas")
-    const width = 640
-    const height = 360
-    tempCanvas.width = width
-    tempCanvas.height = height
+    tempCanvas.width = 640
+    tempCanvas.height = 360
 
     const context = tempCanvas.getContext("2d")
     if (!context) return null
 
     try {
-      context.drawImage(video, 0, 0, width, height)
-      const dataUrl = tempCanvas.toDataURL("image/jpeg", 0.8)
-      return dataUrl
+      context.drawImage(video, 0, 0, 640, 360)
+      return tempCanvas.toDataURL("image/jpeg", 0.8)
     } catch (error) {
       console.error("Error capturing frame:", error)
       return null
@@ -625,10 +545,7 @@ if (!isRecordingRef.current) return
   // -----------------------------
   const getElapsedTime = () => {
     if (!startTimeRef.current) return "00:00"
-    const elapsed = Math.floor(
-      (Date.now() - startTimeRef.current.getTime()) / 1000
-    )
-    // Update current time for timeline
+    const elapsed = Math.floor((Date.now() - startTimeRef.current.getTime()) / 1000)
     setCurrentTime(elapsed)
     const minutes = Math.floor(elapsed / 60)
     const seconds = elapsed % 60
@@ -636,15 +553,14 @@ if (!isRecordingRef.current) return
   }
 
   // -----------------------------
-  // 8) Recording control (start/stop)
+  // 8) Recording control
   // -----------------------------
   const startRecording = async () => {
     setCurrentTime(0)
     setVideoDuration(0)
-    
-    // Load TensorFlow models on demand when starting recording
-    if (!mlModelsReady) {
-      console.log("📦 Loading TensorFlow models on demand...")
+
+    if (!mlModelsReadyRef.current) {
+      console.log("Loading TensorFlow models on demand...")
       setInitializationProgress("Loading AI models...")
       setIsInitializing(true)
       try {
@@ -655,7 +571,7 @@ if (!isRecordingRef.current) return
         return
       }
     }
-    
+
     if (!mediaStreamRef.current) {
       setError("Camera not ready. Please wait.")
       return
@@ -664,14 +580,19 @@ if (!isRecordingRef.current) return
     setError(null)
     setTimestamps([])
     setAnalysisProgress(0)
+    frameFilter.reset()
+
+    // Reset all live data refs
+    currentPoseKeypointsRef.current = []
+    prevPoseKeypointsRef.current = null
+    currentFaceDetectedRef.current = false
+    currentFaceConfidenceRef.current = undefined
 
     startTimeRef.current = new Date()
     isRecordingRef.current = true
     setIsRecording(true)
-    // Start tracking video duration
-    if (durationIntervalRef.current) {
-      clearInterval(durationIntervalRef.current)
-    }
+
+    if (durationIntervalRef.current) clearInterval(durationIntervalRef.current)
     durationIntervalRef.current = setInterval(() => {
       if (isRecordingRef.current) {
         const elapsed = Math.floor((Date.now() - startTimeRef.current!.getTime()) / 1000)
@@ -679,54 +600,36 @@ if (!isRecordingRef.current) return
       }
     }, 1000)
 
-    // Start speech recognition
     if (recognitionRef.current) {
       setTranscript("")
+      transcriptRef.current = ""
       setIsTranscribing(true)
       recognitionRef.current.start()
     }
 
-    // Start video recording using MediaRecorder with WebM container (MP4 not supported by browsers)
+    // FIX: Set up MediaRecorder handlers once only — no duplicate assignments
     recordedChunksRef.current = []
-    
-    // Check for supported mimeType with audio+video codecs
+
     const getSupportedMimeType = () => {
       const types = [
         'video/webm;codecs=vp9,opus',
-        'video/webm;codecs=vp8,opus', 
+        'video/webm;codecs=vp8,opus',
         'video/webm;codecs=vp9',
         'video/webm;codecs=vp8',
         'video/webm'
       ]
       for (const type of types) {
-        if (MediaRecorder.isTypeSupported(type)) {
-          return type
-        }
+        if (MediaRecorder.isTypeSupported(type)) return type
       }
       return 'video/webm'
     }
-    
+
     const mimeType = getSupportedMimeType()
     console.log('Using MediaRecorder mimeType:', mimeType)
-    
-    const mediaRecorder = new MediaRecorder(mediaStreamRef.current, {
-      mimeType
-    })
 
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        recordedChunksRef.current.push(event.data)
-      }
-    }
+    const mediaRecorder = new MediaRecorder(mediaStreamRef.current, { mimeType })
 
-    mediaRecorder.onstop = () => {
-      const blob = new Blob(recordedChunksRef.current, { type: mimeType })
-      const url = URL.createObjectURL(blob)
-      setRecordedVideoUrl(url)
-      setVideoName("stream.webm")
-    }
-
-    // Set up data handling before starting
+    // FIX: Assign handlers once
     mediaRecorder.ondataavailable = (event) => {
       if (event.data && event.data.size > 0) {
         recordedChunksRef.current.push(event.data)
@@ -741,27 +644,20 @@ if (!isRecordingRef.current) return
     }
 
     mediaRecorderRef.current = mediaRecorder
-    // Start recording with a timeslice of 1000ms (1 second)
     mediaRecorder.start(1000)
 
-    // Start the TensorFlow detection loop only if models are ready
-    if (detectionFrameRef.current) {
-      cancelAnimationFrame(detectionFrameRef.current)
-    }
-    
-    // Only start detection if ML models are loaded
-    if (mlModelsReady) {
+    if (detectionFrameRef.current) cancelAnimationFrame(detectionFrameRef.current)
+
+    // FIX: Use ref, not state, to check if models are ready
+    if (mlModelsReadyRef.current) {
       lastDetectionTime.current = 0
       detectionFrameRef.current = requestAnimationFrame(runDetection)
     } else {
       console.warn("ML models not ready yet, detection will start once loaded")
     }
 
-    // Set up repeated frame analysis every 3 seconds
-    if (analysisIntervalRef.current) {
-      clearInterval(analysisIntervalRef.current)
-    }
-    analyzeFrame() // first immediate call
+    if (analysisIntervalRef.current) clearInterval(analysisIntervalRef.current)
+    analyzeFrame()
     analysisIntervalRef.current = setInterval(analyzeFrame, 3000)
   }
 
@@ -775,12 +671,10 @@ if (!isRecordingRef.current) return
       setIsTranscribing(false)
     }
 
-    // Stop MediaRecorder if active
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
       mediaRecorderRef.current.stop()
     }
 
-    // Stop detection loop and analysis interval
     if (detectionFrameRef.current) {
       cancelAnimationFrame(detectionFrameRef.current)
       detectionFrameRef.current = null
@@ -796,15 +690,13 @@ if (!isRecordingRef.current) return
   }
 
   // -----------------------------
-  // 9) Save video functionality
+  // 9) Save video
   // -----------------------------
   const handleSaveVideo = () => {
     if (!recordedVideoUrl || !videoName) return
 
     try {
-      const savedVideos: SavedVideo[] = JSON.parse(
-        localStorage.getItem("savedVideos") || "[]"
-      )
+      const savedVideos: SavedVideo[] = JSON.parse(localStorage.getItem("savedVideos") || "[]")
       const newVideo: SavedVideo = {
         id: Date.now().toString(),
         name: videoName,
@@ -828,25 +720,18 @@ if (!isRecordingRef.current) return
     setIsClient(true)
   }, [])
 
-  // Update current time and duration
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
 
-    const handleTimeUpdate = () => {
-      setCurrentTime(video.currentTime)
-    }
-
+    const handleTimeUpdate = () => setCurrentTime(video.currentTime)
     const handleLoadedMetadata = () => {
       setVideoDuration(video.duration || 60)
-      // Reset playback position to start
       video.currentTime = 0
     }
 
     video.addEventListener('timeupdate', handleTimeUpdate)
     video.addEventListener('loadedmetadata', handleLoadedMetadata)
-
-    // Reset playback position when video source changes
     video.currentTime = 0
 
     return () => {
@@ -856,15 +741,12 @@ if (!isRecordingRef.current) return
   }, [recordedVideoUrl])
 
   useEffect(() => {
-    // Only initialize on client side
     if (typeof window === 'undefined') return
-    
+
     initSpeechRecognition()
     const init = async () => {
       await startWebcam()
-      // TensorFlow models are now loaded on-demand when Start Recording is clicked
-      // This makes the page load faster
-      console.log("📷 Webcam ready. TensorFlow will load when you click Start Recording.")
+      console.log("Webcam ready. TensorFlow will load when you click Start Recording.")
       setIsInitializing(false)
     }
     init()
@@ -874,12 +756,12 @@ if (!isRecordingRef.current) return
       if (analysisIntervalRef.current) clearInterval(analysisIntervalRef.current)
       if (detectionFrameRef.current) cancelAnimationFrame(detectionFrameRef.current)
     }
-  }, [isClient]) // Only run after client-side hydration
+  }, [isClient])
 
-  // Start detection when ML models become ready and recording is active
+  // Start detection when ML models become ready mid-recording
   useEffect(() => {
     if (mlModelsReady && isRecordingRef.current && !detectionFrameRef.current) {
-      console.log("Starting TensorFlow detection now that models are ready")
+      console.log("Starting TensorFlow detection — models now ready")
       lastDetectionTime.current = 0
       detectionFrameRef.current = requestAnimationFrame(runDetection)
     }
@@ -888,7 +770,6 @@ if (!isRecordingRef.current) return
   // -----------------------------
   // Render
   // -----------------------------
-  // Don't render anything on server-side
   if (!isClient) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
@@ -994,13 +875,13 @@ if (!isRecordingRef.current) return
                     {timestamps.length > 0 ? (
                       <Timeline
                         events={timestamps.map(ts => {
-                          const [m, s] = ts.timestamp.split(':').map(Number);
+                          const [m, s] = ts.timestamp.split(':').map(Number)
                           return {
                             startTime: m * 60 + s,
                             endTime: m * 60 + s + 3,
                             type: ts.isDangerous ? 'warning' : 'normal',
                             label: ts.description
-                          };
+                          }
                         })}
                         totalDuration={videoDuration || 60}
                         currentTime={currentTime}
@@ -1012,7 +893,6 @@ if (!isRecordingRef.current) return
                     )}
                   </div>
 
-                  {/* Transcript Section */}
                   <div className="bg-zinc-900/30 p-4 sm:p-6 rounded-2xl border border-white/5 backdrop-blur-sm">
                     <div className="flex items-center justify-between mb-4">
                       <h2 className="text-lg sm:text-xl font-semibold text-white">
@@ -1050,7 +930,6 @@ if (!isRecordingRef.current) return
                 </div>
               </div>
 
-              {/* Save section – shown only after recording stops */}
               {isClient && !isRecording && recordedVideoUrl && (
                 <div className="mt-8 p-6 bg-zinc-900/10 rounded-2xl border border-white/5 backdrop-blur-sm">
                   <h2 className="text-xl font-semibold mb-4 text-white">
@@ -1083,3 +962,5 @@ if (!isRecordingRef.current) return
     </div>
   )
 }
+ENDOFFILE
+echo "Done"
