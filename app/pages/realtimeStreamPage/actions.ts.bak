@@ -112,18 +112,6 @@ export async function detectEvents(
 - Shoplifting
 - Vandalism
 - Trespassing
-
-IMPORTANT — Only report events from the list above.
-DO NOT report any of the following (these are observations, not events):
-- Person visible in frame
-- Person standing normally
-- Person partially visible
-- Person in shadow or obscured
-- Normal walking or movement
-- Camera or lighting artifacts
-
-If nothing from the dangerous event list is occurring, return isDangerous: false
-with a one-line description like "Scene normal" or "No event detected".
 ${tensorflowContext ? `
 TENSORFLOW ML DETECTION DATA (use this to enhance your analysis):
 ${tensorflowContext}

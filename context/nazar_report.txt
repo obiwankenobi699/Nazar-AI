@@ -1,0 +1,448 @@
+==================================
+ NAZAR AI ARCHITECTURE REPORT
+==================================
+
+=== REALTIME PAGE ===
+2:import { frameFilter } from '@/lib/frame-filter'
+13:import { detectEvents, type VideoEvent, type TensorFlowData } from "./actions"
+48:  const [timestamps, setTimestamps] = useState<Timestamp[]>([])
+233:  const runDetection = async () => {
+238:      detectionFrameRef.current = requestAnimationFrame(runDetection)
+245:      detectionFrameRef.current = requestAnimationFrame(runDetection)
+253:      detectionFrameRef.current = requestAnimationFrame(runDetection)
+259:      detectionFrameRef.current = requestAnimationFrame(runDetection)
+360:    detectionFrameRef.current = requestAnimationFrame(runDetection)
+389:  // 5) analyzeFrame — filter-first, then GPT
+391:  const analyzeFrame = async () => {
+406:    const { send, score, reason, debug } = frameFilter.evaluate(canvasRef.current, hints)
+421:    const frame = await captureFrame()
+439:      const result = await detectEvents(frame, transcriptRef.current, tensorflowData)
+469:        setTimestamps(prev => [...prev, newTimestamp])
+494:      console.error('analyzeFrame error:', err)
+496:      if (isRecordingRef.current) stopRecording()
+502:  const captureFrame = async (): Promise<string | null> => {
+543:  const startRecording = async () => {
+567:    setTimestamps([])
+569:    frameFilter.reset()
+665:      detectionFrameRef.current = requestAnimationFrame(runDetection)
+674:    analyzeFrame() // first immediate call
+675:    analysisIntervalRef.current = setInterval(analyzeFrame, 3000)
+678:  const stopRecording = () => {
+796:      detectionFrameRef.current = requestAnimationFrame(runDetection)
+886:                    onClick={startRecording}
+894:                    onClick={stopRecording}
+
+=== OPENAI CALLS ===
+app/api/chat/route.ts:2:import OpenAI from 'openai'
+app/api/chat/route.ts:4:const getOpenAIClient = () => {
+app/api/chat/route.ts:5:  const apiKey = process.env.OPENAI_API_KEY
+app/api/chat/route.ts:7:    throw new Error('OpenAI API key not found in environment variables')
+app/api/chat/route.ts:9:  return new OpenAI({ apiKey })
+app/api/chat/route.ts:13:  let openai
+app/api/chat/route.ts:15:    openai = getOpenAIClient()
+app/api/chat/route.ts:17:    console.error('OpenAI client initialization error:', error)
+app/api/chat/route.ts:19:      { error: 'OpenAI API key not properly configured' },
+app/api/chat/route.ts:32:    console.log('Sending request to OpenAI...')
+app/api/chat/route.ts:33:    const response = await openai.chat.completions.create({
+app/api/chat/route.ts:34:      model: "gpt-4o-mini",
+app/api/chat/route.ts:51:      throw new Error('Invalid response from OpenAI')
+app/api/chat/route.ts:54:    console.log('Successfully received response from OpenAI')
+app/api/summary/route.ts:2:import OpenAI from 'openai'
+app/api/summary/route.ts:4:const getOpenAIClient = () => {
+app/api/summary/route.ts:5:  const apiKey = process.env.OPENAI_API_KEY
+app/api/summary/route.ts:7:    throw new Error('OpenAI API key not found in environment variables')
+app/api/summary/route.ts:9:  return new OpenAI({ apiKey })
+app/api/summary/route.ts:13:  let openai
+app/api/summary/route.ts:15:    openai = getOpenAIClient()
+app/api/summary/route.ts:17:    console.error('OpenAI client initialization error:', error)
+app/api/summary/route.ts:19:      { error: 'OpenAI API key not properly configured' },
+app/api/summary/route.ts:32:    const response = await openai.chat.completions.create({
+app/api/summary/route.ts:33:      model: "gpt-4o",
+app/pages/realtimeStreamPage/page.tsx.bak:13:import { detectEvents, type VideoEvent, type TensorFlowData } from "./actions"
+app/pages/realtimeStreamPage/page.tsx.bak:437:      gptCalls: 0
+app/pages/realtimeStreamPage/page.tsx.bak:455:// Skip GPT call
+app/pages/realtimeStreamPage/page.tsx.bak:460:const result = await detectEvents(
+app/pages/realtimeStreamPage/page.tsx.bak:470:        console.warn("No events returned from detectEvents")
+app/pages/realtimeStreamPage/actions.ts:3:import OpenAI from "openai";
+app/pages/realtimeStreamPage/actions.ts:5:const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+app/pages/realtimeStreamPage/actions.ts:6:if (!OPENAI_API_KEY) {
+app/pages/realtimeStreamPage/actions.ts:7:    throw new Error('OPENAI_API_KEY environment variable is not set');
+app/pages/realtimeStreamPage/actions.ts:10:const openai = new OpenAI({
+app/pages/realtimeStreamPage/actions.ts:11:    apiKey: OPENAI_API_KEY,
+app/pages/realtimeStreamPage/actions.ts:33:export async function detectEvents(
+app/pages/realtimeStreamPage/actions.ts:38:    console.log('Starting frame analysis with OpenAI Vision...');
+app/pages/realtimeStreamPage/actions.ts:83:        console.log('Sending image to OpenAI Vision...', { hasTensorflowData: !!tensorflowData });
+app/pages/realtimeStreamPage/actions.ts:146:            const response = await openai.chat.completions.create({
+app/pages/realtimeStreamPage/actions.ts:147:                model: "gpt-4o-mini", // Cost-effective vision model with good rate limits
+app/pages/realtimeStreamPage/actions.ts:171:            console.log('Raw OpenAI Response:', text);
+app/pages/realtimeStreamPage/actions.ts:202:            console.error('Error calling OpenAI API:', error);
+app/pages/realtimeStreamPage/actions.ts:206:        console.error('Error in detectEvents:', error);
+app/pages/realtimeStreamPage/actions.ts.bak:3:import OpenAI from "openai";
+app/pages/realtimeStreamPage/actions.ts.bak:5:const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+app/pages/realtimeStreamPage/actions.ts.bak:6:if (!OPENAI_API_KEY) {
+app/pages/realtimeStreamPage/actions.ts.bak:7:    throw new Error('OPENAI_API_KEY environment variable is not set');
+app/pages/realtimeStreamPage/actions.ts.bak:10:const openai = new OpenAI({
+app/pages/realtimeStreamPage/actions.ts.bak:11:    apiKey: OPENAI_API_KEY,
+app/pages/realtimeStreamPage/actions.ts.bak:33:export async function detectEvents(
+app/pages/realtimeStreamPage/actions.ts.bak:38:    console.log('Starting frame analysis with OpenAI Vision...');
+app/pages/realtimeStreamPage/actions.ts.bak:83:        console.log('Sending image to OpenAI Vision...', { hasTensorflowData: !!tensorflowData });
+app/pages/realtimeStreamPage/actions.ts.bak:134:            const response = await openai.chat.completions.create({
+app/pages/realtimeStreamPage/actions.ts.bak:135:                model: "gpt-4o-mini", // Cost-effective vision model with good rate limits
+app/pages/realtimeStreamPage/actions.ts.bak:159:            console.log('Raw OpenAI Response:', text);
+app/pages/realtimeStreamPage/actions.ts.bak:190:            console.error('Error calling OpenAI API:', error);
+app/pages/realtimeStreamPage/actions.ts.bak:194:        console.error('Error in detectEvents:', error);
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:13:import { detectEvents, type VideoEvent, type TensorFlowData } from "./actions"
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:435:// Skip GPT call
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:440:const result = await detectEvents(
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:450:        console.warn("No events returned from detectEvents")
+app/pages/realtimeStreamPage/page.tsx:13:import { detectEvents, type VideoEvent, type TensorFlowData } from "./actions"
+app/pages/realtimeStreamPage/page.tsx:62:  const [filterStats, setFilterStats] = useState({ evaluated: 0, blocked: 0, gptCalls: 0 })
+app/pages/realtimeStreamPage/page.tsx:88:  const gptCallCountRef      = useRef(0)
+app/pages/realtimeStreamPage/page.tsx:389:  // 5) analyzeFrame — filter-first, then GPT
+app/pages/realtimeStreamPage/page.tsx:414:          gptCalls:  gptCallCountRef.current,
+app/pages/realtimeStreamPage/page.tsx:424:    gptCallCountRef.current++
+app/pages/realtimeStreamPage/page.tsx:428:      gptCalls:  gptCallCountRef.current,
+app/pages/realtimeStreamPage/page.tsx:430:    console.log(`[FILTER] 🟢 SEND #${gptCallCountRef.current} score=${score}`, debug)
+app/pages/realtimeStreamPage/page.tsx:439:      const result = await detectEvents(frame, transcriptRef.current, tensorflowData)
+app/pages/realtimeStreamPage/page.tsx:570:    gptCallCountRef.current    = 0
+app/pages/realtimeStreamPage/page.tsx:576:    setFilterStats({ evaluated: 0, blocked: 0, gptCalls: 0 })
+app/pages/realtimeStreamPage/page.tsx:862:                    <span className="text-zinc-400">GPT calls <span className="text-purple-400">{filterStats.gptCalls}</span></span>
+app/pages/upload/actions.ts:17:export async function detectEvents(base64Image: string): Promise<{ events: VideoEvent[], rawResponse: string }> {
+app/pages/upload/actions.ts:126:        console.error('Error in detectEvents:', error);
+app/pages/upload/page.tsx:14:import { detectEvents, type VideoEvent } from "./actions"
+app/pages/upload/page.tsx:139:            const result = await detectEvents(frame)
+lib/frame-filter.ts:4:// Sits between TensorFlow and GPT in page.tsx.
+lib/frame-filter.ts:6:// Expected result: ~90% of frames never reach GPT.
+lib/frame-filter.ts:13:  anomalyThreshold: number      // 0–100, GPT fires only above this
+lib/frame-filter.ts:14:  cooldownMs: number            // minimum ms between two GPT calls
+lib/frame-filter.ts:16:  warmupMs: number              // ms after reset before GPT is allowed (avoids startup noise)
+lib/frame-filter.ts:64:  private lastGptCall = 0
+lib/frame-filter.ts:177:      this.lastGptCall = Date.now()
+lib/frame-filter.ts:188:    if (Date.now() - this.lastGptCall < this.cfg.cooldownMs) {
+lib/frame-filter.ts:194:    // ── All layers passed — GPT call is justified ────────────────────────
+lib/frame-filter.ts:196:    this.lastGptCall = Date.now()
+lib/frame-filter.ts:202:    this.lastGptCall = 0
+lib/frame-filter.ts.bak:4:// Sits between TensorFlow and GPT in page.tsx.
+lib/frame-filter.ts.bak:6:// Expected result: ~90% of frames never reach GPT.
+lib/frame-filter.ts.bak:13:  anomalyThreshold: number      // 0–100, GPT fires only above this
+lib/frame-filter.ts.bak:14:  cooldownMs: number            // minimum ms between two GPT calls
+lib/frame-filter.ts.bak:62:  private lastGptCall = 0
+lib/frame-filter.ts.bak:165:      this.lastGptCall = Date.now()
+lib/frame-filter.ts.bak:176:    if (Date.now() - this.lastGptCall < this.cfg.cooldownMs) {
+lib/frame-filter.ts.bak:182:    // ── All layers passed — GPT call is justified ────────────────────────
+lib/frame-filter.ts.bak:184:    this.lastGptCall = Date.now()
+lib/frame-filter.ts.bak:190:    this.lastGptCall = 0
+lib/frame-filter.ts.bak.1780055132:4:// Sits between TensorFlow and GPT in page.tsx.
+lib/frame-filter.ts.bak.1780055132:6:// Expected result: ~90% of frames never reach GPT.
+lib/frame-filter.ts.bak.1780055132:13:  anomalyThreshold: number      // 0–100, GPT fires only above this
+lib/frame-filter.ts.bak.1780055132:14:  cooldownMs: number            // minimum ms between two GPT calls
+lib/frame-filter.ts.bak.1780055132:62:  private lastGptCall = 0
+lib/frame-filter.ts.bak.1780055132:157:    if (Date.now() - this.lastGptCall < this.cfg.cooldownMs) {
+lib/frame-filter.ts.bak.1780055132:163:    // ── All layers passed — GPT call is justified ────────────────────────
+lib/frame-filter.ts.bak.1780055132:165:    this.lastGptCall = Date.now()
+lib/frame-filter.ts.bak.1780055132:171:    this.lastGptCall = 0
+
+=== TIMESTAMP CREATION ===
+app/pages/realtimeStreamPage/page.tsx.bak:9:import TimestampList from "@/components/timestamp-list"
+app/pages/realtimeStreamPage/page.tsx.bak:12:import type { Timestamp } from "@/app/types"
+app/pages/realtimeStreamPage/page.tsx.bak:28:  timestamps: Timestamp[]
+app/pages/realtimeStreamPage/page.tsx.bak:48:  const [timestamps, setTimestamps] = useState<Timestamp[]>([])
+app/pages/realtimeStreamPage/page.tsx.bak:477:          const newTimestamp = {
+app/pages/realtimeStreamPage/page.tsx.bak:478:            timestamp: getElapsedTime(),
+app/pages/realtimeStreamPage/page.tsx.bak:483:          console.log("Adding new timestamp:", newTimestamp)
+app/pages/realtimeStreamPage/page.tsx.bak:484:          setTimestamps((prev) => {
+app/pages/realtimeStreamPage/page.tsx.bak:485:            console.log("Previous timestamps:", prev.length, "Adding:", newTimestamp.description)
+app/pages/realtimeStreamPage/page.tsx.bak:486:            return [...prev, newTimestamp]
+app/pages/realtimeStreamPage/page.tsx.bak:494:              description: `At ${newTimestamp.timestamp}, the following dangerous activity was detected: ${event.description}`,
+app/pages/realtimeStreamPage/page.tsx.bak:495:              timestamp: newTimestamp.timestamp,
+app/pages/realtimeStreamPage/page.tsx.bak:665:    setTimestamps([])
+app/pages/realtimeStreamPage/page.tsx.bak:813:        timestamps: timestamps
+app/pages/realtimeStreamPage/page.tsx.bak:994:                    {timestamps.length > 0 ? (
+app/pages/realtimeStreamPage/page.tsx.bak:996:                        events={timestamps.map(ts => {
+app/pages/realtimeStreamPage/page.tsx.bak:997:                          const [m, s] = ts.timestamp.split(':').map(Number);
+app/pages/realtimeStreamPage/page.tsx.bak:1045:                    <TimestampList
+app/pages/realtimeStreamPage/page.tsx.bak:1046:                      timestamps={timestamps}
+app/pages/realtimeStreamPage/page.tsx.bak:1047:                      onTimestampClick={() => {}}
+app/pages/realtimeStreamPage/page.tsx.bak:1081:        <ChatInterface timestamps={timestamps} />
+app/pages/realtimeStreamPage/actions.ts:15:    timestamp: string;
+app/pages/realtimeStreamPage/actions.ts:138:            "timestamp": "00:00",
+app/pages/realtimeStreamPage/actions.ts.bak:15:    timestamp: string;
+app/pages/realtimeStreamPage/actions.ts.bak:126:            "timestamp": "00:00",
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:9:import TimestampList from "@/components/timestamp-list"
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:12:import type { Timestamp } from "@/app/types"
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:28:  timestamps: Timestamp[]
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:48:  const [timestamps, setTimestamps] = useState<Timestamp[]>([])
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:457:          const newTimestamp = {
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:458:            timestamp: getElapsedTime(),
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:463:          console.log("Adding new timestamp:", newTimestamp)
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:464:          setTimestamps((prev) => {
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:465:            console.log("Previous timestamps:", prev.length, "Adding:", newTimestamp.description)
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:466:            return [...prev, newTimestamp]
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:474:              description: `At ${newTimestamp.timestamp}, the following dangerous activity was detected: ${event.description}`,
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:475:              timestamp: newTimestamp.timestamp,
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:645:    setTimestamps([])
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:793:        timestamps: timestamps
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:974:                    {timestamps.length > 0 ? (
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:976:                        events={timestamps.map(ts => {
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:977:                          const [m, s] = ts.timestamp.split(':').map(Number);
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:1025:                    <TimestampList
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:1026:                      timestamps={timestamps}
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:1027:                      onTimestampClick={() => {}}
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:1061:        <ChatInterface timestamps={timestamps} />
+app/pages/realtimeStreamPage/page.tsx:9:import TimestampList from "@/components/timestamp-list"
+app/pages/realtimeStreamPage/page.tsx:12:import type { Timestamp } from "@/app/types"
+app/pages/realtimeStreamPage/page.tsx:28:  timestamps: Timestamp[]
+app/pages/realtimeStreamPage/page.tsx:48:  const [timestamps, setTimestamps] = useState<Timestamp[]>([])
+app/pages/realtimeStreamPage/page.tsx:464:        const newTimestamp = {
+app/pages/realtimeStreamPage/page.tsx:465:          timestamp:   getElapsedTime(),
+app/pages/realtimeStreamPage/page.tsx:469:        setTimestamps(prev => [...prev, newTimestamp])
+app/pages/realtimeStreamPage/page.tsx:474:            description: `At ${newTimestamp.timestamp}: ${event.description}`,
+app/pages/realtimeStreamPage/page.tsx:475:            timestamp:   newTimestamp.timestamp,
+app/pages/realtimeStreamPage/page.tsx:567:    setTimestamps([])
+app/pages/realtimeStreamPage/page.tsx:723:        timestamps: timestamps
+app/pages/realtimeStreamPage/page.tsx:920:                    {timestamps.length > 0 ? (
+app/pages/realtimeStreamPage/page.tsx:922:                        events={timestamps.map(ts => {
+app/pages/realtimeStreamPage/page.tsx:923:                          const [m, s] = ts.timestamp.split(':').map(Number);
+app/pages/realtimeStreamPage/page.tsx:971:                    <TimestampList
+app/pages/realtimeStreamPage/page.tsx:972:                      timestamps={timestamps}
+app/pages/realtimeStreamPage/page.tsx:973:                      onTimestampClick={() => {}}
+app/pages/realtimeStreamPage/page.tsx:1007:        <ChatInterface timestamps={timestamps} />
+
+=== FRAME FILTER ===
+5:// 3 layers: adaptive motion diff → anomaly score → cooldown gate
+11:  motionThreshold: number       // min fraction of pixels that must change (0–1)
+13:  anomalyThreshold: number      // 0–100, GPT fires only above this
+14:  cooldownMs: number            // minimum ms between two GPT calls
+20:  motionThreshold: 0.06,
+22:  anomalyThreshold: 50,
+23:  cooldownMs: 8000,
+44:  reason: 'first_frame' | 'no_motion' | 'low_score' | 'cooldown' | 'send'
+85:  evaluate(canvas: HTMLCanvasElement, hints: FilterHints): FilterResult {
+112:      : motionLevel / this.cfg.motionThreshold
+114:    if (motionLevel < this.cfg.motionThreshold) {
+147:    const score = this.computeScore({
+162:    if (score < this.cfg.anomalyThreshold) {
+169:    // Emergency situations bypass cooldown
+187:    // ── Layer 3: cooldown ────────────────────────────────────────────────
+188:    if (Date.now() - this.lastGptCall < this.cfg.cooldownMs) {
+191:      return this.result(false, score, 'cooldown', debug)
+269:  private computeScore(f: {
+
+=== TENSORFLOW ===
+app/pages/realtimeStreamPage/page.tsx.bak:17:import type * as blazeface from '@tensorflow-models/blazeface'
+app/pages/realtimeStreamPage/page.tsx.bak:72:  const faceModelRef = useRef<blazeface.BlazeFaceModel | null>(null)
+app/pages/realtimeStreamPage/page.tsx.bak:106:        tfModules.blazefaceModel.load({
+app/pages/realtimeStreamPage/page.tsx.bak:111:          tfModules.poseDetection.SupportedModels.MoveNet,
+app/pages/realtimeStreamPage/page.tsx.bak:113:            modelType: tfModules.poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+app/pages/realtimeStreamPage/page.tsx.bak:263:        const predictions = await faceModelRef.current.estimateFaces(video, false)
+app/pages/realtimeStreamPage/page.tsx.bak:264:        predictions.forEach((prediction: blazeface.NormalizedFace) => {
+app/pages/realtimeStreamPage/page.tsx.bak:296:        const poses = await poseModelRef.current.estimatePoses(video)
+app/pages/realtimeStreamPage/page.tsx.bak:403:          const predictions = await faceModelRef.current.estimateFaces(videoRef.current, false)
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:17:import type * as blazeface from '@tensorflow-models/blazeface'
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:72:  const faceModelRef = useRef<blazeface.BlazeFaceModel | null>(null)
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:106:        tfModules.blazefaceModel.load({
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:111:          tfModules.poseDetection.SupportedModels.MoveNet,
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:113:            modelType: tfModules.poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:263:        const predictions = await faceModelRef.current.estimateFaces(video, false)
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:264:        predictions.forEach((prediction: blazeface.NormalizedFace) => {
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:296:        const poses = await poseModelRef.current.estimatePoses(video)
+app/pages/realtimeStreamPage/page.tsx.bak.1780057176:403:          const predictions = await faceModelRef.current.estimateFaces(videoRef.current, false)
+app/pages/realtimeStreamPage/page.tsx:17:import type * as blazeface from '@tensorflow-models/blazeface'
+app/pages/realtimeStreamPage/page.tsx:73:  const faceModelRef = useRef<blazeface.BlazeFaceModel | null>(null)
+app/pages/realtimeStreamPage/page.tsx:117:        tfModules.blazefaceModel.load({
+app/pages/realtimeStreamPage/page.tsx:122:          tfModules.poseDetection.SupportedModels.MoveNet,
+app/pages/realtimeStreamPage/page.tsx:124:            modelType: tfModules.poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING,
+app/pages/realtimeStreamPage/page.tsx:274:        const predictions = await faceModelRef.current.estimateFaces(video, false)
+app/pages/realtimeStreamPage/page.tsx:277:        predictions.forEach((prediction: blazeface.NormalizedFace) => {
+app/pages/realtimeStreamPage/page.tsx:309:        const poses = await poseModelRef.current.estimatePoses(video)
+lib/tensorflow-loader.ts:3:import type * as blazeface from '@tensorflow-models/blazeface'
+lib/tensorflow-loader.ts:7:let blazefaceModel: typeof blazeface | null = null
+lib/tensorflow-loader.ts:13:  blazefaceModel: typeof blazeface
+lib/tensorflow-loader.ts:24:  if (isInitialized && tfjs && blazefaceModel && poseDetection) {
+lib/tensorflow-loader.ts:25:    return { tfjs, blazefaceModel, poseDetection }
+lib/tensorflow-loader.ts:64:    const [blazefaceModule, poseDetectionModule] = await Promise.all([
+lib/tensorflow-loader.ts:65:      import('@tensorflow-models/blazeface'),
+lib/tensorflow-loader.ts:69:    blazefaceModel = blazefaceModule
+lib/tensorflow-loader.ts:74:    return { tfjs, blazefaceModel, poseDetection }
+lib/tensorflow-loader.ts:83:  if (isInitialized && tfjs && blazefaceModel && poseDetection) {
+lib/tensorflow-loader.ts:84:    return { tfjs, blazefaceModel, poseDetection }
+lib/tensorflow-loader.ts:90:  return isInitialized && !!tfjs && !!blazefaceModel && !!poseDetection
+
+=== API ROUTES ===
+app/api/send-whatsapp/route.ts
+app/api/send-email/route.ts
+app/api/chat/route.ts
+app/api/upload/route.ts
+app/api/send-telegram/route.ts
+app/api/analyze/route.ts
+app/api/summary/route.ts
+
+=== PROJECT STRUCTURE ===
+./app/actions.ts
+./app/api/analyze/route.ts
+./app/api/chat/route.ts
+./app/api/send-email/route.ts
+./app/api/send-telegram/route.ts
+./app/api/send-whatsapp/route.ts
+./app/api/summary/route.ts
+./app/api/upload/route.ts
+./app/auth/callback/route.ts
+./app/(auth-pages)/forgot-password/page.tsx
+./app/(auth-pages)/layout.tsx
+./app/(auth-pages)/sign-in/page.tsx
+./app/(auth-pages)/sign-up/page.tsx
+./app/(auth-pages)/smtp-message.tsx
+./app/components/Timeline.tsx
+./app/layout.tsx
+./app/pages/realtimeStreamPage/actions.ts
+./app/pages/realtimeStreamPage/page.tsx
+./app/pages/saved-videos/page.tsx
+./app/pages/statistics/page.tsx
+./app/pages/upload/actions.ts
+./app/pages/uploadOneVideoPage/page.tsx
+./app/pages/upload/page.tsx
+./app/pages/video/[id]/page.tsx
+./app/page.tsx
+./app/protected/page.tsx
+./app/protected/ProtectedPageClient.tsx
+./app/protected/reset-password/page.tsx
+./app/test/testEmail/page.tsx
+./app/test/testJsonBoxesPage/page.tsx
+./app/test/testJsonBoxesVideo/page.tsx
+./app/test/testTelegram/page.tsx
+./app/types/speech-recognition.d.ts
+./app/types.ts
+./app/utils/gemini-config.ts
+./backup/gemini.ts
+./backup/page.tsx
+./components/animated-text.tsx
+./components/boundingBoxDrawer.tsx
+./components/bounding-boxes-overlay.tsx
+./components/camera-feed.tsx
+./components/camera-modal.tsx
+./components/chat-interface.tsx
+./components/date-picker.tsx
+./components/deploy-button.tsx
+./components/env-var-warning.tsx
+./components/event-feed.tsx
+./components/footer.tsx
+./components/form-message.tsx
+./components/header-auth.tsx
+./components/header-nav.tsx
+./components/hero.tsx
+./components/home-link.tsx
+./components/main-navbar.tsx
+./components/navigation-events.tsx
+./components/next-logo.tsx
+./components/particle-background.tsx
+./components/security-alert-modal.tsx
+./components/stats-overview.tsx
+./components/submit-button.tsx
+./components/supabase-logo.tsx
+./components/theme-switcher.tsx
+./components/timestamp-list.tsx
+./components/tutorial/code-block.tsx
+./components/tutorial/connect-supabase-steps.tsx
+./components/tutorial/fetch-data-steps.tsx
+./components/tutorial/sign-up-user-steps.tsx
+./components/tutorial/tutorial-step.tsx
+./components/typography/inline-code.tsx
+./components/ui/badge.tsx
+./components/ui/button.tsx
+./components/ui/checkbox.tsx
+./components/ui/dialog.tsx
+./components/ui/dropdown-menu.tsx
+./components/ui/input.tsx
+./components/ui/label.tsx
+./components/ui/progress.tsx
+./components/ui/uploadFileButton.tsx
+./components/ui/visually-hidden.tsx
+./components/video-player.tsx
+./hawkwatch-mobile/app/(auth)/_layout.tsx
+./hawkwatch-mobile/app/(auth)/login.tsx
+./hawkwatch-mobile/app/index.tsx
+./hawkwatch-mobile/app/_layout.tsx
+./hawkwatch-mobile/app/(tabs)/footages.tsx
+./hawkwatch-mobile/app/(tabs)/_layout.tsx
+./hawkwatch-mobile/app/(tabs)/live.tsx
+./hawkwatch-mobile/app/(tabs)/notifications.tsx
+./hawkwatch-mobile/app/(tabs)/profile.tsx
+./hawkwatch-mobile/components/animated-text.tsx
+./hawkwatch-mobile/components/boundingBoxDrawer.tsx
+./hawkwatch-mobile/components/bounding-boxes-overlay.tsx
+./hawkwatch-mobile/components/camera-feed.tsx
+./hawkwatch-mobile/components/camera-modal.tsx
+./hawkwatch-mobile/components/chat-interface.tsx
+./hawkwatch-mobile/components/date-picker.tsx
+./hawkwatch-mobile/components/deploy-button.tsx
+./hawkwatch-mobile/components/env-var-warning.tsx
+./hawkwatch-mobile/components/event-feed.tsx
+./hawkwatch-mobile/components/form-message.tsx
+./hawkwatch-mobile/components/gemini-footer.tsx
+./hawkwatch-mobile/components/header-auth.tsx
+./hawkwatch-mobile/components/header-nav.tsx
+./hawkwatch-mobile/components/hero.tsx
+./hawkwatch-mobile/components/home-link.tsx
+./hawkwatch-mobile/components/main-navbar.tsx
+./hawkwatch-mobile/components/navigation-events.tsx
+./hawkwatch-mobile/components/next-logo.tsx
+./hawkwatch-mobile/components/particle-background.tsx
+./hawkwatch-mobile/components/security-alert-modal.tsx
+./hawkwatch-mobile/components/stats-overview.tsx
+./hawkwatch-mobile/components/submit-button.tsx
+./hawkwatch-mobile/components/supabase-logo.tsx
+./hawkwatch-mobile/components/theme-switcher.tsx
+./hawkwatch-mobile/components/timestamp-list.tsx
+./hawkwatch-mobile/components/tutorial/code-block.tsx
+./hawkwatch-mobile/components/tutorial/connect-supabase-steps.tsx
+./hawkwatch-mobile/components/tutorial/fetch-data-steps.tsx
+./hawkwatch-mobile/components/tutorial/sign-up-user-steps.tsx
+./hawkwatch-mobile/components/tutorial/tutorial-step.tsx
+./hawkwatch-mobile/components/typography/inline-code.tsx
+./hawkwatch-mobile/components/ui/badge.tsx
+./hawkwatch-mobile/components/ui/button.tsx
+./hawkwatch-mobile/components/ui/checkbox.tsx
+./hawkwatch-mobile/components/ui/dialog.tsx
+./hawkwatch-mobile/components/ui/dropdown-menu.tsx
+./hawkwatch-mobile/components/ui/input.tsx
+./hawkwatch-mobile/components/ui/label.tsx
+./hawkwatch-mobile/components/ui/progress.tsx
+./hawkwatch-mobile/components/ui/uploadFileButton.tsx
+./hawkwatch-mobile/components/ui/visually-hidden.tsx
+./hawkwatch-mobile/components/video-player.tsx
+./hawkwatch-mobile/Hawkwatch/app/+html.tsx
+./hawkwatch-mobile/Hawkwatch/app/_layout.tsx
+./hawkwatch-mobile/Hawkwatch/app/modal.tsx
+./hawkwatch-mobile/Hawkwatch/app/+not-found.tsx
+./hawkwatch-mobile/Hawkwatch/app/(tabs)/index.tsx
+./hawkwatch-mobile/Hawkwatch/app/(tabs)/_layout.tsx
+./hawkwatch-mobile/Hawkwatch/app/(tabs)/two.tsx
+./hawkwatch-mobile/Hawkwatch/components/EditScreenInfo.tsx
+./hawkwatch-mobile/Hawkwatch/components/ExternalLink.tsx
+./hawkwatch-mobile/Hawkwatch/components/StyledText.tsx
+./hawkwatch-mobile/Hawkwatch/components/Themed.tsx
+./hawkwatch-mobile/Hawkwatch/components/useClientOnlyValue.ts
+./hawkwatch-mobile/Hawkwatch/components/useClientOnlyValue.web.ts
+./hawkwatch-mobile/Hawkwatch/components/useColorScheme.ts
+./hawkwatch-mobile/Hawkwatch/components/useColorScheme.web.ts
+./hawkwatch-mobile/Hawkwatch/constants/Colors.ts
+./hawkwatch-mobile/lib/aiDetection.ts
+./hawkwatch-mobile/lib/notifications.ts
+./hawkwatch-mobile/lib/shared-assets.ts
+./hawkwatch-mobile/lib/shared-data.ts
+./hawkwatch-mobile/lib/supabase.ts
+./hawkwatch-mobile/lib/utils.ts
+./lib/data.ts
+./lib/frame-filter.ts
+./lib/tensorflow-loader.ts
+./lib/utils.ts
+./middleware.ts
+./next.config.ts
+./next-env.d.ts
+./tailwind.config.ts
+./types/index.ts
+./utils/supabase/check-env-vars.ts
+./utils/supabase/client.ts
+./utils/supabase/middleware.ts
+./utils/supabase/server.ts
+./utils/utils.ts

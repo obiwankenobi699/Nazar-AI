@@ -59,6 +59,7 @@ export default function Page() {
   const [mlModelsReady, setMlModelsReady] = useState(false)
   const [lastPoseKeypoints, setLastPoseKeypoints] = useState<Keypoint[]>([])
   const [isClient, setIsClient] = useState(false)
+  const [filterStats, setFilterStats] = useState({ evaluated: 0, blocked: 0, gptCalls: 0 })
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -76,7 +77,17 @@ export default function Page() {
   const recordedChunksRef = useRef<Blob[]>([])
   const isRecordingRef = useRef<boolean>(false)
   const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // ── Fresh refs — no stale closures ──────────────────────────────────────
+  const transcriptRef        = useRef<string>('')
+  const faceDetectedRef      = useRef<boolean>(false)
+  const faceConfidenceRef    = useRef<number | undefined>(undefined)
   const prevPoseKeypointsRef = useRef<Keypoint[] | null>(null)
+  const lastDescriptionRef   = useRef<{ text: string; time: number }>({ text: '', time: 0 })
+  const recordingStateRef    = useRef<'NORMAL' | 'SUSPICIOUS' | 'DANGER'>('NORMAL')
+  const gptCallCountRef      = useRef(0)
+  const framesEvaluatedRef   = useRef(0)
+  const framesBlockedRef     = useRef(0)
   // -----------------------------
   // 1) Initialize ML Models
   // -----------------------------
@@ -261,6 +272,8 @@ export default function Page() {
     if (faceModelRef.current) {
       try {
         const predictions = await faceModelRef.current.estimateFaces(video, false)
+        faceDetectedRef.current   = predictions.length > 0
+        faceConfidenceRef.current = predictions.length > 0 ? predictions[0].probability as number : undefined
         predictions.forEach((prediction: blazeface.NormalizedFace) => {
           const start = prediction.topLeft as [number, number]
           const end = prediction.bottomRight as [number, number]
@@ -373,227 +386,116 @@ export default function Page() {
   }
 
   // -----------------------------
-  // 5) Analyze frame via API (and send email if dangerous)
+  // 5) analyzeFrame — filter-first, then GPT
   // -----------------------------
   const analyzeFrame = async () => {
     if (!isRecordingRef.current) return
+    if (!canvasRef.current) return
 
-    const currentTranscript = transcript.trim()
-    const currentPoseKeypoints = [...lastPoseKeypoints]
+    framesEvaluatedRef.current++
+
+    const hints = {
+      poseKeypoints:     lastPoseKeypoints,
+      prevPoseKeypoints: prevPoseKeypointsRef.current,
+      faceDetected:      faceDetectedRef.current,
+      faceConfidence:    faceConfidenceRef.current,
+      transcript:        transcriptRef.current,
+      frameHeight:       canvasRef.current.height,
+    }
+
+    const { send, score, reason, debug } = frameFilter.evaluate(canvasRef.current, hints)
+
+    if (!send) {
+      framesBlockedRef.current++
+      if (framesEvaluatedRef.current % 10 === 0) {
+        setFilterStats({
+          evaluated: framesEvaluatedRef.current,
+          blocked:   framesBlockedRef.current,
+          gptCalls:  gptCallCountRef.current,
+        })
+      }
+      console.log(`[FILTER] ⚪ DROP reason=${reason} score=${score}`)
+      return
+    }
+
+    const frame = await captureFrame()
+    if (!frame || !frame.startsWith('data:image/jpeg')) return
+
+    gptCallCountRef.current++
+    setFilterStats({
+      evaluated: framesEvaluatedRef.current,
+      blocked:   framesBlockedRef.current,
+      gptCalls:  gptCallCountRef.current,
+    })
+    console.log(`[FILTER] 🟢 SEND #${gptCallCountRef.current} score=${score}`, debug)
+
+    const tensorflowData: TensorFlowData = {
+      poseKeypoints:  lastPoseKeypoints,
+      faceDetected:   faceDetectedRef.current,
+      faceConfidence: faceConfidenceRef.current,
+    }
 
     try {
-      const frame = await captureFrame()
-      if (!frame) return
+      const result = await detectEvents(frame, transcriptRef.current, tensorflowData)
+      if (!isRecordingRef.current) return
+      if (!result?.events?.length) return
 
-      if (!frame.startsWith("data:image/jpeg")) {
-        console.error("Invalid frame format")
-        return
-      }
+      for (const event of result.events) {
+        // Dedup: skip if same description within 30s
+        const now = Date.now()
+        const isSimilar =
+          lastDescriptionRef.current.text.length > 10 &&
+          now - lastDescriptionRef.current.time < 30000 &&
+          event.description.toLowerCase().includes(
+            lastDescriptionRef.current.text.toLowerCase().slice(0, 20)
+          )
+        if (isSimilar) { console.log('[DEDUP] skipped:', event.description); continue }
+        lastDescriptionRef.current = { text: event.description, time: now }
 
-      // Build TensorFlow data for enhanced Gemini analysis
-      const tensorflowData: TensorFlowData = {
-        poseKeypoints: currentPoseKeypoints,
-        faceDetected: faceModelRef.current !== null && currentPoseKeypoints.length > 0,
-        faceConfidence: undefined // Will be set if face is detected
-      }
+        // State machine
+        recordingStateRef.current = event.isDangerous ? 'DANGER' : score > 30 ? 'SUSPICIOUS' : 'NORMAL'
 
-      // Check face detection status
-      if (faceModelRef.current && videoRef.current) {
-        try {
-          const predictions = await faceModelRef.current.estimateFaces(videoRef.current, false)
-          tensorflowData.faceDetected = predictions.length > 0
-          if (predictions.length > 0) {
-            tensorflowData.faceConfidence = predictions[0].probability as number
+        // Skip non-events
+        if (/scene normal|no event|person (visible|standing|partially|in shadow)/i.test(event.description) && !event.isDangerous) {
+          console.log('[FILTER] non-event skipped:', event.description)
+          continue
+        }
+
+        const newTimestamp = {
+          timestamp:   getElapsedTime(),
+          description: event.description,
+          isDangerous: event.isDangerous,
+        }
+        setTimestamps(prev => [...prev, newTimestamp])
+
+        if (event.isDangerous) {
+          const payload = {
+            title:       'Dangerous Activity Detected',
+            description: `At ${newTimestamp.timestamp}: ${event.description}`,
+            timestamp:   newTimestamp.timestamp,
+            imageBase64: frame,
           }
-        } catch (e) {
-          // Face detection failed, keep defaults
+          try {
+            const r = await fetch('/api/send-telegram', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+            r.ok ? console.log('✅ Telegram') : console.error('❌ Telegram', await r.json())
+          } catch(e) { console.error('❌ Telegram', e) }
+          try {
+            const r = await fetch('/api/send-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+            r.ok ? console.log('✅ WhatsApp') : console.error('❌ WhatsApp', await r.json())
+          } catch(e) { console.error('❌ WhatsApp', e) }
+          try {
+            const r = await fetch('/api/send-email', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ title: payload.title, description: payload.description }) })
+            if (!r.ok) { setError(r.status===401?'Sign in for email alerts.':'Email service error.'); continue }
+            console.log('✅ Email', await r.json())
+          } catch(e) { console.error('❌ Email', e) }
         }
       }
-
-      console.log('📊 TensorFlow data:', {
-        poseKeypoints: currentPoseKeypoints.length,
-        faceDetected: tensorflowData.faceDetected,
-        faceConfidence: tensorflowData.faceConfidence
-      })
-
-if (!canvasRef.current) return
-
-const filterResult = frameFilter.evaluate(
-  canvasRef.current,
-  {
-    poseKeypoints: tensorflowData.poseKeypoints,
-    prevPoseKeypoints: prevPoseKeypointsRef.current,
-    faceDetected: tensorflowData.faceDetected,
-    faceConfidence: tensorflowData.faceConfidence,
-    transcript: currentTranscript,
-    frameHeight: canvasRef.current.height
-  }
-)
-
-
-    ;(window as any).__nazarStats ??= {
-      filterChecks: 0,
-      blocked: 0,
-      gptCalls: 0
-    }
-
-    ;(window as any).__nazarStats.filterChecks++
-
-    console.log(
-      "[FILTER]",
-      {
-        send: filterResult.send,
-        score: filterResult.score,
-        reason: filterResult.reason,
-        debug: filterResult.debug
-      }
-    )
-
-
-console.log("Frame Filter:", filterResult)
-
-// Skip GPT call
-if (!filterResult.send) {
-  return
-}
-
-const result = await detectEvents(
-  frame,
-  currentTranscript,
-  tensorflowData
-)
-
-if (!isRecordingRef.current) return
-
-      // Add null/undefined check for result
-      if (!result || !result.events) {
-        console.warn("No events returned from detectEvents")
-        return
-      }
-
-      if (result.events.length > 0) {
-        // Use for...of instead of forEach for proper async handling
-        for (const event of result.events) {
-          const newTimestamp = {
-            timestamp: getElapsedTime(),
-            description: event.description,
-            isDangerous: event.isDangerous
-          }
-          
-          console.log("Adding new timestamp:", newTimestamp)
-          setTimestamps((prev) => {
-            console.log("Previous timestamps:", prev.length, "Adding:", newTimestamp.description)
-            return [...prev, newTimestamp]
-          })
-
-          // For dangerous events, send notifications (email + Telegram)
-          if (event.isDangerous) {
-            console.log("🚨 DANGEROUS EVENT DETECTED - Sending notifications...")
-            const notificationPayload = {
-              title: "Dangerous Activity Detected",
-              description: `At ${newTimestamp.timestamp}, the following dangerous activity was detected: ${event.description}`,
-              timestamp: newTimestamp.timestamp,
-              imageBase64: frame // Include the captured frame
-            }
-
-            // Send Telegram notification with image
-            try {
-              console.log("📱 Sending Telegram notification...")
-              const telegramResponse = await fetch("/api/send-telegram", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json"
-                },
-                body: JSON.stringify(notificationPayload)
-              })
-              
-              if (telegramResponse.ok) {
-                console.log("✅ Telegram notification sent successfully")
-              } else {
-                const telegramError = await telegramResponse.json()
-                console.error("❌ Failed to send Telegram notification:", telegramError)
-              }
-            } catch (telegramError) {
-              console.error("❌ Error sending Telegram notification:", telegramError)
-            }
-
-            // Send WhatsApp notification
-            try {
-              console.log("💬 Sending WhatsApp notification...")
-              const whatsappResponse = await fetch("/api/send-whatsapp", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json"
-                },
-                body: JSON.stringify(notificationPayload)
-              })
-
-              if (whatsappResponse.ok) {
-                console.log("✅ WhatsApp notification sent successfully")
-              } else {
-                const whatsappError = await whatsappResponse.json()
-                console.error("❌ Failed to send WhatsApp notification:", whatsappError)
-              }
-            } catch (whatsappError) {
-              console.error("❌ Error sending WhatsApp notification:", whatsappError)
-            }
-
-            // Send email notification
-            try {
-              console.log("📧 Sending email notification...")
-              const emailPayload = {
-                title: notificationPayload.title,
-                description: notificationPayload.description
-              }
-              const response = await fetch("/api/send-email", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Accept: "application/json"
-                },
-                body: JSON.stringify(emailPayload)
-              })
-              
-              // Check if response is ok before trying to parse JSON
-              if (!response.ok) {
-                if (response.status === 401) {
-                  setError(
-                    "Please sign in to receive email notifications for dangerous events."
-                  )
-                } else if (response.status === 500) {
-                  setError(
-                    "Email service not properly configured. Please contact support."
-                  )
-                } else {
-                  const errorText = await response.text()
-                  console.error("Failed to send email notification:", errorText)
-                  setError(
-                    `Failed to send email notification. Please try again later.`
-                  )
-                }
-                continue // Continue to next event instead of return
-              }
-              
-              // Only try to parse JSON for successful responses
-              const resData = await response.json()
-              console.log("✅ Email notification sent successfully:", resData)
-            } catch (error) {
-              console.error("Error sending email notification:", error)
-            }
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error analyzing frame:", error)
-      setError("Error analyzing frame. Please try again.")
-      if (isRecordingRef.current) {
-        stopRecording()
-      }
+    } catch (err) {
+      console.error('analyzeFrame error:', err)
+      setError('Error analyzing frame.')
+      if (isRecordingRef.current) stopRecording()
     }
   }
-
   // -----------------------------
   // 6) Capture current video frame (for analysis)
   // -----------------------------
@@ -664,6 +566,14 @@ if (!isRecordingRef.current) return
     setError(null)
     setTimestamps([])
     setAnalysisProgress(0)
+    frameFilter.reset()
+    gptCallCountRef.current    = 0
+    framesEvaluatedRef.current = 0
+    framesBlockedRef.current   = 0
+    prevPoseKeypointsRef.current = null
+    lastDescriptionRef.current   = { text: '', time: 0 }
+    recordingStateRef.current    = 'NORMAL'
+    setFilterStats({ evaluated: 0, blocked: 0, gptCalls: 0 })
 
     startTimeRef.current = new Date()
     isRecordingRef.current = true
@@ -828,6 +738,8 @@ if (!isRecordingRef.current) return
     setIsClient(true)
   }, [])
 
+  useEffect(() => { transcriptRef.current = transcript }, [transcript])
+
   // Update current time and duration
   useEffect(() => {
     const video = videoRef.current
@@ -939,6 +851,20 @@ if (!isRecordingRef.current) return
                   />
                 </div>
               </div>
+
+
+                {/* Filter Stats Bar */}
+                {isRecording && (
+                  <div className="flex flex-wrap items-center gap-4 px-4 py-2 bg-zinc-900/60 border border-white/5 rounded-xl text-xs font-mono">
+                    <span className="text-zinc-500">Filter</span>
+                    <span className="text-zinc-400">evaluated <span className="text-white">{filterStats.evaluated}</span></span>
+                    <span className="text-zinc-400">blocked <span className="text-green-400">{filterStats.blocked}</span></span>
+                    <span className="text-zinc-400">GPT calls <span className="text-purple-400">{filterStats.gptCalls}</span></span>
+                    {filterStats.evaluated > 0 && (
+                      <span className="text-zinc-400">reduction <span className="text-yellow-400">{Math.round((filterStats.blocked / filterStats.evaluated) * 100)}%</span></span>
+                    )}
+                  </div>
+                )}
 
               {error && !isInitializing && (
                 <div className="p-4 bg-red-900/50 border border-red-500 rounded-lg text-red-200 text-sm">

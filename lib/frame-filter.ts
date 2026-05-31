@@ -13,6 +13,7 @@ export interface FilterConfig {
   anomalyThreshold: number      // 0–100, GPT fires only above this
   cooldownMs: number            // minimum ms between two GPT calls
   fallFramesRequired: number    // consecutive "body low" frames before scoring as fall
+  warmupMs: number              // ms after reset before GPT is allowed (avoids startup noise)
 }
 
 export const DEFAULT_CONFIG: FilterConfig = {
@@ -21,6 +22,7 @@ export const DEFAULT_CONFIG: FilterConfig = {
   anomalyThreshold: 50,
   cooldownMs: 8000,
   fallFramesRequired: 3,
+  warmupMs: 5000,
 }
 
 // ─── Input shape — matches what page.tsx already computes ───────────────────
@@ -71,6 +73,9 @@ export class FrameFilter {
   // sudden movement detection
   private velocityHistory: number[] = []
 
+  // warmup tracking
+  private startTime = Date.now()
+
   constructor(config: Partial<FilterConfig> = {}) {
     this.cfg = { ...DEFAULT_CONFIG, ...config }
   }
@@ -84,6 +89,13 @@ export class FrameFilter {
     }
 
     const frame = ctx.getImageData(0, 0, canvas.width, canvas.height)
+
+    // ── Warmup gate ──────────────────────────────────────────────────
+    if (Date.now() - this.startTime < this.cfg.warmupMs) {
+      this.lastImageData = frame
+      this.updateBaseline(0)
+      return this.result(false, 0, 'no_motion', this.emptyDebug())
+    }
 
     // ── Layer 1: adaptive motion ─────────────────────────────────────────
     if (!this.lastImageData) {
@@ -192,6 +204,7 @@ export class FrameFilter {
     this.adaptiveMean = 0
     this.bodyLowStreak = 0
     this.velocityHistory = []
+    this.startTime = Date.now()
   }
 
   // ── Private helpers ──────────────────────────────────────────────────────
@@ -263,7 +276,7 @@ export class FrameFilter {
     if (f.suddenMovement) s += 25              // velocity spike — lunge, fight
     if (f.likelyFall)     s += 30             // confirmed fall (N frames)
     else if (f.bodyLow)   s += 10             // partial fall signal
-    if (f.noFaceButBody)  s += 15             // person down / turned away
+    if (f.noFaceButBody)  s += 8              // person down / turned away (reduced: dark room FP)
     if (f.audioKeyword)   s += 30             // shouting keywords
     if (f.poseCount < 5 && f.poseCount > 0) s += 10  // person obscured
     return Math.min(Math.round(s), 100)

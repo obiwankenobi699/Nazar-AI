@@ -1,0 +1,1444 @@
+================================
+app/types.ts
+================================
+export interface Timestamp {
+
+================================
+app/actions.ts
+================================
+export const signUpAction = async (formData: FormData) => {
+  const email = formData.get("email")?.toString();
+  const password = formData.get("password")?.toString();
+  const supabase = await createClient();
+  const origin = (await headers()).get("origin");
+  const configuredSiteUrl =
+  const baseUrl = (configuredSiteUrl || origin || "").replace(/\/$/, "");
+  const { error } = await supabase.auth.signUp({
+export const signInAction = async (formData: FormData) => {
+  const email = formData.get("email") as string;
+  const password = formData.get("password") as string;
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({
+export const forgotPasswordAction = async (formData: FormData) => {
+  const email = formData.get("email")?.toString();
+  const supabase = await createClient();
+  const origin = (await headers()).get("origin");
+  const configuredSiteUrl =
+  const baseUrl = (configuredSiteUrl || origin || "").replace(/\/$/, "");
+  const callbackUrl = formData.get("callbackUrl")?.toString();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+export const resetPasswordAction = async (formData: FormData) => {
+  const supabase = await createClient();
+  const password = formData.get("password") as string;
+  const confirmPassword = formData.get("confirmPassword") as string;
+  const { error } = await supabase.auth.updateUser({
+export const signOutAction = async () => {
+  const supabase = await createClient();
+
+================================
+app/auth/callback/route.ts
+================================
+export async function GET(request: Request) {
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get("code");
+  const origin = requestUrl.origin;
+  const redirectTo = requestUrl.searchParams.get("redirect_to")?.toString();
+    const supabase = await createClient();
+
+================================
+app/layout.tsx
+================================
+const defaultUrl = process.env.VERCEL_URL
+export const metadata = {
+const geistSans = Geist({
+export default function RootLayout({
+		<html lang="en" className={geistSans.className} suppressHydrationWarning>
+			<body className="bg-background text-foreground" suppressHydrationWarning>
+					attribute="class"
+					<main className="min-h-screen flex flex-col items-center">
+						<div className="flex-1 w-full flex flex-col items-center">
+							<nav className="fixed top-0 left-0 right-0 z-[100] w-full flex justify-center border-b border-white/10 bg-black/40 backdrop-blur-md h-16">
+								<div className="w-full max-w-7xl flex justify-between items-center p-3 px-4 sm:px-8 text-sm">
+									<div className="flex items-center gap-2 sm:gap-12">
+										<div className="flex items-center">
+									<div className="flex items-center gap-2 sm:gap-4">
+							<div className="w-full pt-16">
+
+================================
+app/test/testJsonBoxesPage/page.tsx
+================================
+const boxes =[
+export default function ImageWithBoundingBoxes() {
+    const imageUrl = '/tableWithThings.jpg'; 
+      <main className="flex flex-col items-center justify-center bg-black p-4 min-h-screen">
+        <div className="w-full max-w-md space-y-8 text-center">
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-6">Bounding Boxes on Image</h1>
+
+================================
+app/test/testEmail/page.tsx
+================================
+export default function TestEmailPage() {
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
+  const handleSendEmail = async () => {
+      const emailPayload = {
+      const response = await fetch('/api/send-email', {
+      const result = await response.json()
+    <div className="p-4 max-w-md mx-auto space-y-4">
+      <h1 className="text-2xl font-bold mb-4">Test Email Notifications</h1>
+      <div className="space-y-2">
+          className="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+          <div className="p-3 bg-red-100 border border-red-200 text-red-700 rounded">
+          <div className="p-3 bg-green-100 border border-green-200 text-green-700 rounded">
+        <div className="text-sm text-gray-600 mt-4">
+          <ol className="list-decimal ml-5 mt-2 space-y-1">
+
+================================
+app/test/testJsonBoxesVideo/page.tsx
+================================
+const boxes =[
+export default function ImageWithBoundingBoxes() {
+    const imageUrl = '/tableWithThings.jpg'; 
+      <main className="flex flex-col items-center justify-center bg-black p-4 min-h-screen">
+        <div className="w-full max-w-md space-y-8 text-center">
+          <h1 className="text-3xl md:text-4xl font-bold text-white mb-6">Bounding Boxes on Image</h1>
+
+================================
+app/test/testTelegram/page.tsx
+================================
+export default function TestTelegramPage() {
+  const [status, setStatus] = useState<string>('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [includeImage, setIncludeImage] = useState(true)
+  const sampleImageBase64 = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAMCAgMCAgMDAwMEAwMEBQgFBQQEBQoHBwYIDAoMCwsKCwsNDhIQDQ4RDgsLEBYQERMUFRUVDA8XGBYUGBIUFRT/2wBDAQMEBAUEBQkFBQkUDQsNFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBT/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAn/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBEQCEAwEPwAB/9k='
+  const sendTestNotification = async () => {
+      const response = await fetch('/api/send-telegram', {
+      const data = await response.json()
+  const sendDangerousEventTest = async () => {
+      const payload = {
+      const response = await fetch('/api/send-telegram', {
+      const data = await response.json()
+    <div className="min-h-screen bg-gray-900 text-white p-8">
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-3xl font-bold mb-2">🔔 Test Telegram Notifications</h1>
+        <p className="text-gray-400 mb-8">
+        <div className="bg-gray-800 rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Configuration Status</h2>
+          <p className="text-gray-300 text-sm mb-4">
+          <ul className="list-disc list-inside text-gray-400 text-sm space-y-1">
+            <li><code className="bg-gray-700 px-1 rounded">TELEGRAM_BOT_TOKEN</code> - Your bot token from @BotFather</li>
+            <li><code className="bg-gray-700 px-1 rounded">TELEGRAM_CHAT_ID</code> - Your chat ID from @userinfobot</li>
+        <div className="bg-gray-800 rounded-lg p-6 mb-6">
+          <h2 className="text-xl font-semibold mb-4">Test Options</h2>
+          <label className="flex items-center gap-3 mb-4 cursor-pointer">
+              className="w-5 h-5 rounded bg-gray-700 border-gray-600"
+          <div className="flex flex-col sm:flex-row gap-4">
+              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded-lg font-medium transition-colors"
+              className="px-6 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 rounded-lg font-medium transition-colors"
+          <div className={`p-4 rounded-lg ${
+            <p className="text-sm">{status}</p>
+        <div className="mt-8 bg-gray-800 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">📱 Setup Instructions</h2>
+          <ol className="list-decimal list-inside text-gray-300 space-y-3 text-sm">
+              <ul className="list-disc list-inside ml-6 mt-1 text-gray-400">
+                <li>Open Telegram and search for <code className="bg-gray-700 px-1 rounded">@BotFather</code></li>
+                <li>Send <code className="bg-gray-700 px-1 rounded">/newbot</code> and follow the prompts</li>
+              <ul className="list-disc list-inside ml-6 mt-1 text-gray-400">
+                <li>Search for <code className="bg-gray-700 px-1 rounded">@userinfobot</code> on Telegram</li>
+              <ul className="list-disc list-inside ml-6 mt-1 text-gray-400">
+
+================================
+app/utils/gemini-config.ts
+================================
+
+================================
+app/api/send-whatsapp/route.ts
+================================
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
+const TWILIO_WHATSAPP_FROM = process.env.TWILIO_WHATSAPP_FROM || process.env.TWILIO_PHONE_NUMBER
+const TWILIO_WHATSAPP_TO = process.env.TWILIO_WHATSAPP_TO
+function normalizeWhatsAppNumber(value?: string): string | undefined {
+async function sendWhatsAppMessage(message: string): Promise<{ ok: boolean; error?: string }> {
+  const from = normalizeWhatsAppNumber(TWILIO_WHATSAPP_FROM)
+  const to = normalizeWhatsAppNumber(TWILIO_WHATSAPP_TO)
+  const auth = Buffer.from(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`).toString('base64')
+  const body = new URLSearchParams({
+    const response = await fetch(
+    const data = await response.json()
+      const errorMessage = data?.message || 'Twilio API request failed'
+export async function POST(request: Request) {
+    const { title, description, timestamp, imageBase64 }: WhatsAppPayload = await request.json()
+    const alertMessage = [
+    const result = await sendWhatsAppMessage(alertMessage)
+
+================================
+app/api/send-email/route.ts
+================================
+function getResendClient() {
+export async function POST(request: Request) {
+    const { title, description } = await request.json()
+    const resendClient = getResendClient();
+    const { data, error } = await resendClient.emails.send({
+
+================================
+app/api/chat/route.ts
+================================
+const getOpenAIClient = () => {
+  const apiKey = process.env.OPENAI_API_KEY
+export async function POST(request: Request) {
+    const { messages, events } = await request.json()
+    const contextMessage = events.length > 0
+    const response = await openai.chat.completions.create({
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+
+================================
+app/api/upload/route.ts
+================================
+export async function POST(request: Request) {
+    // The actual file upload functionality would need proper FormData handling
+
+================================
+app/api/send-telegram/route.ts
+================================
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID
+async function sendTelegramMessage(text: string): Promise<boolean> {
+    const response = await fetch(
+    const data = await response.json()
+async function sendTelegramPhoto(imageBase64: string, caption: string): Promise<boolean> {
+    const base64Data = imageBase64.includes(',') 
+    const imageBuffer = Buffer.from(base64Data, 'base64')
+    const formData = new FormData()
+    const blob = new Blob([imageBuffer], { type: 'image/jpeg' })
+    const response = await fetch(
+    const data = await response.json()
+export async function POST(request: Request) {
+    const { title, description, timestamp, imageBase64 }: TelegramPayload = await request.json()
+    const alertMessage = `
+
+================================
+app/api/analyze/route.ts
+================================
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+export async function POST(request: Request) {
+    const { videoUrl } = await request.json()
+    const mockTimestamps = [
+
+================================
+app/api/summary/route.ts
+================================
+const getOpenAIClient = () => {
+  const apiKey = process.env.OPENAI_API_KEY
+export async function POST(request: Request) {
+    const { keyMoments } = await request.json()
+    const momentsText = keyMoments.map((moment: any) => 
+    const response = await openai.chat.completions.create({
+    const errorMessage = error.message || 'Failed to generate summary'
+
+================================
+app/pages/realtimeStreamPage/actions.ts
+================================
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const openai = new OpenAI({
+export interface VideoEvent {
+export interface PoseKeypoint {
+export interface TensorFlowData {
+export async function detectEvents(
+            const { poseKeypoints, faceDetected, faceConfidence } = tensorflowData;
+                const visibleKeypoints = poseKeypoints.filter(kp => (kp.score || 0) > 0.3);
+                const keypointNames = visibleKeypoints.map(kp => kp.name).filter(Boolean);
+                const avgY = visibleKeypoints.reduce((sum, kp) => sum + kp.y, 0) / visibleKeypoints.length;
+                const hasHead = keypointNames.some(n => n?.includes('nose') || n?.includes('eye') || n?.includes('ear'));
+                const hasShoulders = keypointNames.some(n => n?.includes('shoulder'));
+        const prompt = `Analyze this frame and determine if any of these specific dangerous situations are occurring:
+            const response = await openai.chat.completions.create({
+            const text = response.choices[0]?.message?.content || '';
+            const codeBlockMatch = text.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
+                const jsonMatch = text.match(/\{[^]*\}/);  
+                const parsed = JSON.parse(jsonStr);
+
+================================
+app/pages/realtimeStreamPage/page.tsx
+================================
+export default function Page() {
+  const [isRecording, setIsRecording] = useState(false)
+  const [timestamps, setTimestamps] = useState<Timestamp[]>([])
+  const [analysisProgress, setAnalysisProgress] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const [isInitializing, setIsInitializing] = useState(true)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [videoDuration, setVideoDuration] = useState(0)
+  const [initializationProgress, setInitializationProgress] = useState<string>('')
+  const [transcript, setTranscript] = useState('')
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const [videoName, setVideoName] = useState('')
+  const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null)
+  const [mlModelsReady, setMlModelsReady] = useState(false)
+  const [lastPoseKeypoints, setLastPoseKeypoints] = useState<Keypoint[]>([])
+  const [isClient, setIsClient] = useState(false)
+  const [filterStats, setFilterStats] = useState({ evaluated: 0, blocked: 0, gptCalls: 0 })
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const mediaStreamRef = useRef<MediaStream | null>(null)
+  const analysisIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const detectionFrameRef = useRef<number | null>(null)
+  const lastDetectionTime = useRef<number>(0)
+  const lastFrameTimeRef = useRef<number>(performance.now())
+  const startTimeRef = useRef<Date | null>(null)
+  const faceModelRef = useRef<blazeface.BlazeFaceModel | null>(null)
+  const poseModelRef = useRef<posedetection.PoseDetector | null>(null)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<Blob[]>([])
+  const isRecordingRef = useRef<boolean>(false)
+  const durationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const transcriptRef        = useRef<string>('')
+  const faceDetectedRef      = useRef<boolean>(false)
+  const faceConfidenceRef    = useRef<number | undefined>(undefined)
+  const prevPoseKeypointsRef = useRef<Keypoint[] | null>(null)
+  const lastDescriptionRef   = useRef<{ text: string; time: number }>({ text: '', time: 0 })
+  const recordingStateRef    = useRef<'NORMAL' | 'SUSPICIOUS' | 'DANGER'>('NORMAL')
+  const gptCallCountRef      = useRef(0)
+  const framesEvaluatedRef   = useRef(0)
+
+================================
+app/pages/saved-videos/page.tsx
+================================
+export default function SavedVideosPage() {
+  const [savedVideos, setSavedVideos] = useState<SavedVideo[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [filteredVideos, setFilteredVideos] = useState<SavedVideo[]>([])
+    const videos = JSON.parse(localStorage.getItem("savedVideos") || "[]")
+    const filtered = savedVideos.filter(
+  const handleDelete = (id: string) => {
+    const updatedVideos = savedVideos.filter((video) => video.id !== id)
+    <div className="min-h-screen bg-black text-white p-4">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-4xl font-extrabold mb-8 text-center text-white tracking-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.7)]">
+        <div className="mb-6 relative">
+            className="w-full bg-zinc-800 border-zinc-700 text-white placeholder-zinc-400 pl-10 pr-4 py-2 rounded-full focus:ring-2 focus:ring-white focus:border-transparent"
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-zinc-400" size={18} />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              className="group bg-zinc-900 rounded-lg overflow-hidden transition-all duration-300 ease-in-out hover:bg-zinc-800 hover:-translate-y-1 hover:shadow-lg hover:shadow-purple-900/20"
+              <div className="group">
+                <div className="aspect-video">
+                    className="w-full h-full object-cover transition-all duration-300 ease-in-out group-hover:scale-105"
+                <div className="p-4">
+                  <h2 className="text-lg font-semibold mb-2 tracking-wide">{video.name}</h2>
+                  <div className="flex justify-between items-center">
+                      className="text-white hover:text-gray-300 text-sm font-medium tracking-wider uppercase transition-colors duration-200"
+                      className="rounded-full"
+                      <Trash2 className="h-4 w-4" />
+          <p className="text-center text-zinc-400 mt-8 text-lg font-light">
+        <div className="mt-12 text-center">
+            className="text-white hover:text-gray-300 text-lg font-medium tracking-wide transition-colors duration-200"
+
+================================
+app/pages/uploadOneVideoPage/page.tsx
+================================
+export default function UploadOneVideoPage() {
+    <div className="min-h-screen bg-gray-900 text-white p-8">
+      <h1 className="text-3xl font-bold mb-6">Upload Single Video</h1>
+      <p className="text-gray-400">Upload and analyze a single video file for threat detection.</p>
+      {/* TODO: Add video upload functionality */}
+
+================================
+app/pages/upload/actions.ts
+================================
+const API_KEY = process.env.GOOGLE_API_KEY;
+const genAI = new GoogleGenerativeAI(API_KEY);
+export interface VideoEvent {
+export async function detectEvents(base64Image: string): Promise<{ events: VideoEvent[], rawResponse: string }> {
+        const base64Data = base64Image.split(',')[1];
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+        const imagePart = {
+        const prompt = `Analyze this frame and determine if any of these specific dangerous situations are occurring:
+            const result = await model.generateContent([
+            const response = await result.response;
+            const text = response.text();
+            const codeBlockMatch = text.match(/```(?:json)?\s*({[\s\S]*?})\s*```/);
+                const jsonMatch = text.match(/\{[^]*\}/);  
+                const parsed = JSON.parse(jsonStr);
+
+================================
+app/pages/upload/page.tsx
+================================
+export default function UploadPage() {
+  const [videoUrl, setVideoUrl] = useState<string>("")
+  const [isUploading, setIsUploading] = useState(false)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [timestamps, setTimestamps] = useState<Timestamp[]>([])
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [videoName, setVideoName] = useState("")
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const captureFrame = async (video: HTMLVideoElement, time: number): Promise<string | null> => {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d');
+  const handleFileUpload = async (e: { target: { files: FileList | null } }) => {
+    const file = e.target.files?.[0]
+      const localUrl = URL.createObjectURL(file)
+      const video = videoRef.current
+        const timeout = setTimeout(() => {
+        const handleLoad = () => {
+        const handleError = () => {
+      const duration = video.duration
+      const interval = 3 // Analyze one frame every 3 seconds
+      const totalFrames = Math.floor(duration / interval)
+      const newTimestamps: Timestamp[] = []
+        const progress = Math.floor((time / duration) * 100)
+        const frame = await captureFrame(video, time)
+            const result = await detectEvents(frame)
+                const minutes = Math.floor(time / 60)
+                const seconds = Math.floor(time % 60)
+  const handleTimestampClick = (timestamp: string) => {
+    const [minutes, seconds] = timestamp.split(":").map(Number)
+    const timeInSeconds = minutes * 60 + seconds
+  const handleSaveVideo = () => {
+    const savedVideos: SavedVideo[] = JSON.parse(localStorage.getItem("savedVideos") || "[]")
+    const newVideo: SavedVideo = {
+    <div className="min-h-screen bg-black text-white flex flex-col items-center justify-start py-8 px-4 sm:px-6">
+      <div className="w-full max-w-5xl relative">
+        <div className="relative z-10 p-0 sm:p-8">
+          <div className="space-y-6 sm:space-y-8">
+            <div className="text-center px-4">
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.7)]">
+              <p className="text-zinc-400 text-sm sm:text-base">Upload a video to analyze key moments and generate timestamps</p>
+
+================================
+app/pages/statistics/page.tsx
+================================
+export default function StatisticsPage() {
+  const exportToCSV = () => {
+    const csvContent = [
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+  const [keyMoments, setKeyMoments] = useState<KeyMoment[]>([])
+  const [summary, setSummary] = useState<string>('')
+  const [isLoadingSummary, setIsLoadingSummary] = useState(false)
+  const [chartData, setChartData] = useState<{
+    const savedVideos = JSON.parse(localStorage.getItem("savedVideos") || "[]")
+    const moments: KeyMoment[] = savedVideos.flatMap((video: any) =>
+    const fetchSummary = async () => {
+        const response = await fetch('/api/summary', {
+        const data = await response.json()
+        const errorMessage = error?.message || 'Unable to generate summary at this time.'
+    const dangerousMoments = moments.filter(moment => moment.isDangerous)
+    const dangerousByVideo = dangerousMoments.reduce((acc: { [key: string]: number }, moment) => {
+    const dangerousCount = dangerousMoments.length
+    const nonDangerousCount = moments.length - dangerousCount
+    const trendData = dangerousMoments.reduce((acc: { [key: string]: number }, moment) => {
+      const [hours, minutes] = moment.timestamp.split(':').map(Number)
+      const interval = `${hours.toString().padStart(2, '0')}:${Math.floor(minutes / 15) * 15}`.padEnd(5, '0')
+  const columnHelper = createColumnHelper<KeyMoment>()
+  const columns = [
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+  const table = useReactTable({
+    <div className="flex-1 w-full flex flex-col gap-8 items-center p-8">
+      <div className="w-full max-w-6xl flex flex-col gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="p-6 bg-card rounded-lg border shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">Dangerous Moments by Video</h2>
+          <div className="p-6 bg-card rounded-lg border shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">Dangerous vs Non-Dangerous Moments</h2>
+          <div className="p-6 bg-card rounded-lg border shadow-sm">
+            <h2 className="text-xl font-semibold mb-4">Danger Trend Over Time</h2>
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Video Key Moments</h1>
+
+================================
+app/pages/video/[id]/page.tsx
+================================
+export default function VideoPage() {
+  const [video, setVideo] = useState<SavedVideo | null>(null)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [videoDuration, setVideoDuration] = useState(0)
+  const params = useParams()
+  const router = useRouter()
+  const videoRef = useRef<HTMLVideoElement>(null)
+    const savedVideos: SavedVideo[] = JSON.parse(localStorage.getItem("savedVideos") || "[]")
+    const foundVideo = savedVideos.find((v) => v.id === params.id)
+    const video = videoRef.current
+    const handleTimeUpdate = () => {
+    const handleLoadedMetadata = () => {
+  const handleTimestampClick = (timestamp: string) => {
+    const [minutes, seconds] = timestamp.split(":").map(Number)
+    const timeInSeconds = minutes * 60 + seconds
+    return <div className="min-h-screen bg-black text-white flex items-center justify-center">Loading...</div>
+    <div className="min-h-screen bg-black text-white p-4">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8 text-center text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.7)]">
+        <div className="space-y-4">
+          <div className="w-full mt-4 space-y-2 bg-gray-900/50 p-4 rounded-lg backdrop-blur-sm">
+            <h2 className="text-xl font-semibold text-white">Key Moments Timeline</h2>
+                  const [minutes, seconds] = ts.timestamp.split(':').map(Number);
+          <div className="flex justify-end mt-4">
+                  const downloadUrl = video.url
+                  const a = document.createElement('a')
+                  const downloadName = video.name.toLowerCase().endsWith('.mp4')
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/20 flex items-center gap-2 backdrop-blur-sm transition-colors"
+              <Download className="w-4 h-4" />
+        <div className="mt-8 text-center">
+          <Link href="/pages/saved-videos" className="text-purple-400 hover:text-purple-300">
+
+================================
+app/(auth-pages)/layout.tsx
+================================
+export default async function Layout({
+    <div className="max-w-7xl flex flex-col gap-12 items-start">{children}</div>
+
+================================
+app/(auth-pages)/forgot-password/page.tsx
+================================
+export default async function ForgotPassword(props: {
+  const searchParams = await props.searchParams;
+      <form className="flex-1 flex flex-col w-full gap-2 text-foreground [&>input]:mb-6 min-w-64 max-w-64 mx-auto">
+          <h1 className="text-2xl font-medium">Reset Password</h1>
+          <p className="text-sm text-secondary-foreground">
+            <Link className="text-primary underline" href="/sign-in">
+        <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
+
+================================
+app/(auth-pages)/sign-in/page.tsx
+================================
+export default async function Login(props: { searchParams: Promise<Message> }) {
+  const searchParams = await props.searchParams
+    <div className="flex justify-center items-center min-h-screen w-full bg-background">
+      <div className="w-full max-w-md px-4">
+        <form className="flex flex-col w-full p-8 space-y-6 bg-card rounded-lg shadow-lg">
+          <h1 className="text-3xl font-bold text-center">Sign in</h1>
+          <p className="text-sm text-center text-muted-foreground">
+            <Link className="text-primary font-medium underline" href="/sign-up">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-base">
+              <Input name="email" id="email" placeholder="you@example.com" required className="text-base" />
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <Label htmlFor="password" className="text-base">
+                <Link className="text-sm text-primary underline" href="/forgot-password">
+                className="text-base"
+            <SubmitButton pendingText="Signing In..." formAction={signInAction} className="w-full text-base">
+
+================================
+app/(auth-pages)/sign-up/page.tsx
+================================
+export default async function Signup(props: {
+  const searchParams = await props.searchParams
+      <div className="w-full flex-1 flex items-center h-screen sm:max-w-md justify-center gap-2 p-4">
+    <div className="flex justify-center items-center min-h-screen w-full bg-background">
+      <div className="w-full max-w-md px-4">
+        <form className="flex flex-col w-full p-8 space-y-6 bg-card rounded-lg shadow-lg">
+          <div className="space-y-2 text-center">
+            <h1 className="text-3xl font-bold">Sign up</h1>
+            <p className="text-sm text-muted-foreground">
+              <Link className="text-primary font-medium underline" href="/sign-in">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-base">
+              <Input name="email" id="email" placeholder="you@example.com" required className="text-base" />
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-base">
+                className="text-base"
+            <SubmitButton formAction={signUpAction} pendingText="Signing up..." className="w-full text-base">
+
+================================
+app/(auth-pages)/smtp-message.tsx
+================================
+export function SmtpMessage() {
+    <div className="bg-muted/50 px-5 py-3 border rounded-md flex gap-4">
+      <InfoIcon size={16} className="mt-0.5" />
+      <div className="flex flex-col gap-1">
+        <small className="text-sm text-secondary-foreground">
+            className="text-primary/50 hover:text-primary flex items-center text-sm gap-1"
+
+================================
+app/components/Timeline.tsx
+================================
+export function Timeline({ events, totalDuration, currentTime = 0 }: TimelineProps) {
+  const [hoveredEvent, setHoveredEvent] = useState<{
+      <div className="w-full overflow-hidden">
+        <div className="relative w-full h-24 bg-gray-800 overflow-x-auto">
+          <div className="absolute w-full min-w-full">
+            <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-600 transform -translate-y-1/2">
+                  className="absolute h-3 w-px bg-gray-500"
+                  <span className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-xs text-gray-400 whitespace-nowrap">
+              const startPercentage = (event.startTime / totalDuration) * 100;
+              const duration = ((event.endTime - event.startTime) / totalDuration) * 100;
+                  className={cn(
+                    const rect = e.currentTarget.getBoundingClientRect();
+                className="absolute w-0.5 h-8 bg-white"
+          className="fixed px-4 py-3 bg-gray-800/95 text-white text-sm pointer-events-none z-50 w-[250px] shadow-xl border border-gray-700/50 transition-opacity duration-200"
+          <div className="font-medium text-sm mb-1.5">{hoveredEvent.event.label}</div>
+          <div className="text-gray-300 text-xs flex justify-between items-center">
+            <span className={cn(
+
+================================
+app/protected/reset-password/page.tsx
+================================
+export default async function ResetPassword(props: {
+  const searchParams = await props.searchParams;
+    <form className="flex flex-col w-full max-w-md p-4 gap-2 [&>input]:mb-4">
+      <h1 className="text-2xl font-medium">Reset password</h1>
+      <p className="text-sm text-foreground/60">
+
+================================
+app/protected/ProtectedPageClient.tsx
+================================
+export default function ProtectedPageClient() {
+  const supabase = createClient()
+  const [selectedCamera, setSelectedCamera] = useState<string | null>(null)
+  const [videoTimes, setVideoTimes] = useState<Record<string, number>>({})
+  const [hoveredCamera, setHoveredCamera] = useState<string | null>(null)
+  const handleAuth = async () => {
+  const handleTimeUpdate = (cameraId: string, time: number) => {
+  const handleEventClick = (cameraId: string, timestamp: number) => {
+    <div className="flex-1 w-full flex">
+      <div className="flex-1 overflow-auto">
+        <div className="container mx-auto py-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  className={`relative aspect-video rounded-lg overflow-hidden hover:ring-2 hover:ring-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-opacity duration-300 ${
+                  <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/75 to-transparent">
+                    <div className="text-white font-medium">{camera.name}</div>
+                    <div className="text-white/75 text-sm">{camera.address}</div>
+      <div className="hidden lg:block w-96 border-l border-gray-200 dark:border-gray-800 overflow-auto p-6">
+        <div className="mt-6">
+
+================================
+app/protected/page.tsx
+================================
+export const dynamic = 'force-dynamic'
+export default function ProtectedPage() {
+
+================================
+app/types/speech-recognition.d.ts
+================================
+
+================================
+app/page.tsx
+================================
+export default async function Home() {
+    <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white relative overflow-hidden">
+      <div className="absolute inset-0 bg-radial-gradient"></div>
+      <div className="w-[100%] h-[95svh] flex flex-col items-center justify-center relative overflow-hidden" style={{ backgroundImage: "url('/gifs/landing-page.gif')", backgroundSize: "cover", backgroundPosition: "center" }}>
+        <div className="absolute inset-0 bg-black/75"></div>
+        <div className="relative z-10 flex flex-col items-center justify-center w-full h-full px-4 text-center">
+          <div className="border border-white p-2 rounded-[40px]">
+            <h2 className="text-sm sm:text-base px-2">24/7 Suraksha</h2>
+          <h1 className="mt-6 sm:mt-10 text-4xl sm:text-6xl font-bold">Turn your <span className="text-[#206EF6]">CCTV</span></h1>
+          <h1 className="mt-4 sm:mt-8 text-4xl sm:text-6xl font-bold line-height-tight">into 24/7 suraksha guard</h1>
+          <div className="mt-8 sm:mt-10 max-w-2xl">
+            <p className="text-lg sm:text-xl text-white/80">Detect theft, fire, and risks in real-time. No new hardware needed</p>
+      <div id="detection" className="w-[100%] h-auto flex flex-col items-center justify-center px-4 overflow-hidden">
+          <div className="mt-12 sm:mt-20 w-full sm:w-[85%] lg:w-[75%] flex flex-col md:flex-row gap-8 items-center">
+                <div className="w-full md:w-[50%] flex flex-col items-start justify-center">
+                    <div className="inline-flex items-center justify-center p-1 px-3 bg-[rgb(0,0,0,0.4)] border border-white rounded-[20px]">
+                      <p className="text-[#F46F6F] text-xs sm:text-sm font-bold">REAL-TIME DETECTION</p>
+                    <h2 className="w-full mt-5 text-3xl sm:text-5xl font-bold leading-tight">Catches <span className="text-[#F46F6F]">bad actors</span> in real time</h2>
+                    <p className="w-full mt-5 text-lg sm:text-xl text-[rgb(255,255,255,0.6)] leading-normal">Nazar detects suspicious behavior & sends instant alert to security teams</p>
+                <div className="w-full md:w-[50%] flex items-center justify-center p-0 sm:p-4 min-h-[250px] sm:min-h-[300px]">
+                  <div className="relative w-full rounded-lg overflow-hidden">
+                      className="w-full rounded-xl border-2 border-[rgb(255,255,255,0.4)]"
+                    <div className="absolute top-[75%] sm:top-[85%] right-4 sm:left-[60%] flex items-center gap-2 bg-black/60 border border-[#F46F6F] rounded px-3 py-1.5 backdrop-blur-sm">
+                      <span className="w-2 h-2 rounded-full bg-[#F46F6F] animate-pulse"></span>
+                      <span className="text-[#F46F6F] text-xs sm:text-sm font-semibold tracking-wide">⚠ THEFT DETECTED</span>
+          <div className="mt-20 w-full sm:w-[85%] lg:w-[75%] flex flex-col md:flex-row-reverse gap-8 items-center">
+                <div className="w-full md:w-[50%] flex flex-col items-start md:items-end justify-center">
+                    <div className="w-full md:w-[85%] flex md:justify-end">
+                      <div className="inline-flex items-center justify-center p-1 px-4 bg-[rgb(0,0,0,0.4)] border border-white rounded-[20px]">
+                        <p className="text-[#F8E082] text-xs sm:text-sm font-bold">DISASTER PREVENTION</p>
+                    <h2 className="w-full md:w-[85%] md:text-right mt-5 text-3xl sm:text-5xl font-bold leading-tight">Detects <span className="text-[#F8E082]">fire hazards</span> instantly</h2>
+                    <p className="w-full md:w-[85%] md:text-right mt-5 text-lg sm:text-xl text-[rgb(255,255,255,0.6)] leading-normal">Nazar detects smoke and fire in real time & alerts your team and fire department immediately</p>
+                <div className="w-full md:w-[50%] flex items-center justify-center p-0 sm:p-4 min-h-[250px] sm:min-h-[300px]">
+                  <div className="relative w-full rounded-lg overflow-hidden">
+                      className="w-full rounded-xl border-2 border-[rgb(255,255,255,0.4)]"
+                    <div className="absolute top-[75%] sm:top-[85%] right-4 sm:left-[60%] flex items-center gap-2 bg-black/60 border border-[#F8E082] rounded px-3 py-1.5 backdrop-blur-sm">
+                      <span className="w-2 h-2 rounded-full bg-[#F8E082] animate-pulse"></span>
+                      <span className="text-[#F8E082] text-xs sm:text-sm font-semibold tracking-wide">⚠ FIRE DETECTED</span>
+           <div className="mt-20 w-full sm:w-[85%] lg:w-[75%] flex flex-col md:flex-row gap-8 items-center">
+                <div className="w-full md:w-[50%] flex flex-col items-start justify-center">
+
+================================
+lib/data.ts
+================================
+export const locations: Location[] = [
+export const analyzedEvents = [
+function parseTimeToSeconds(timeStr: string): number {
+  const [minutes, seconds] = timeStr.split(':').map(Number)
+function convertAnalyzedEventsToEvents(): Event[] {
+    const camera = locations
+export const events = convertAnalyzedEventsToEvents()
+export interface Stats {
+export function getSystemStats(): Stats {
+function generateMockEvent(): Event {
+	const cameras = locations.flatMap((location) => location.cameras);
+	const types = [
+export const initialEvents: Event[] = Array.from({ length: 15 }, (_, i) => ({
+export async function getBoundingBoxData(videoName: string): Promise<BoundingBoxData | null> {
+    const response = await fetch(`/bounding_boxes/${videoName}_boxes.json`)
+
+================================
+lib/tensorflow-loader.ts
+================================
+export interface TensorFlowModules {
+export async function loadTensorFlowModules(): Promise<TensorFlowModules | null> {
+    const [blazefaceModule, poseDetectionModule] = await Promise.all([
+export function getTensorFlowModules(): TensorFlowModules | null {
+export function isTensorFlowReady(): boolean {
+
+================================
+lib/utils.ts
+================================
+export function cn(...inputs: ClassValue[]) {
+
+================================
+lib/frame-filter.ts
+================================
+export interface FilterConfig {
+export const DEFAULT_CONFIG: FilterConfig = {
+export interface FilterHints {
+export interface FilterResult {
+// ─── FrameFilter class — one instance per camera ────────────────────────────
+export class FrameFilter {
+    const ctx = canvas.getContext('2d')
+    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const motionLevel = this.computeMotion(this.lastImageData.data, frame.data)
+    const relativeMotion = this.adaptiveMean > 0.001
+    const poseVelocity = this.computeVelocity(
+    const suddenMovement = this.detectSuddenMovement(poseVelocity)
+    const bodyLow = this.isBodyLow(hints.poseKeypoints, hints.frameHeight)
+    const likelyFall = this.bodyLowStreak >= this.cfg.fallFramesRequired
+    const noFaceButBody = !hints.faceDetected &&
+    const audioKeyword = this.hasAudioKeyword(hints.transcript)
+    const score = this.computeScore({
+    const debug = {
+    const emergency =
+    const total = Math.floor(b.length / 16)
+        const dx = curr[i].x - prev[i].x
+        const dy = curr[i].y - prev[i].y
+    const avg = this.velocityHistory.reduce((a, b) => a + b, 0) / this.velocityHistory.length
+    const relevant = [0, 11, 12]
+    const keywords = ['help', 'fire', 'stop', 'thief', 'fight', 'police', 'no', 'aah', 'attack', 'gun']
+export const frameFilter = new FrameFilter()
+
+================================
+scripts/generate_bounding_boxes.py
+================================
+                classes=[0],  # class 0 is person in COCO dataset
+
+================================
+scripts/generate_video_data.py
+================================
+
+================================
+components/bounding-boxes-overlay.tsx
+================================
+export function BoundingBoxesOverlay({
+  const [boxesData, setBoxesData] = useState<BoundingBoxData | null>(null)
+  const [currentBoxes, setCurrentBoxes] = useState<[number, number, number, number][]>([])
+    const frameNumber = Math.floor(currentTime * fps).toString()
+    const frameData = boxesData.frames[frameNumber]
+  const scaleX = width / boxesData.video_info.width
+  const scaleY = height / boxesData.video_info.height
+    <div className="absolute inset-0 pointer-events-none">
+        const [x1, y1, x2, y2] = box
+        const scaledStyle = {
+            className="absolute border-2 border-green-400 bg-green-400/20"
+
+================================
+components/theme-switcher.tsx
+================================
+const ThemeSwitcher = () => {
+  const [mounted, setMounted] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const ICON_SIZE = 16;
+              className={"text-muted-foreground"}
+              className={"text-muted-foreground"}
+              className={"text-muted-foreground"}
+      <DropdownMenuContent className="w-content" align="start">
+          <DropdownMenuRadioItem className="flex gap-2" value="light">
+            <Sun size={ICON_SIZE} className="text-muted-foreground" />{" "}
+          <DropdownMenuRadioItem className="flex gap-2" value="dark">
+            <Moon size={ICON_SIZE} className="text-muted-foreground" />{" "}
+          <DropdownMenuRadioItem className="flex gap-2" value="system">
+            <Laptop size={ICON_SIZE} className="text-muted-foreground" />{" "}
+export { ThemeSwitcher };
+
+================================
+components/animated-text.tsx
+================================
+const phrases = ["Prevent dangerous activity", "Real-time analytics", "Receive instant alerts"]
+export default function AnimatedText() {
+  const [text, setText] = useState("")
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [loopNum, setLoopNum] = useState(0)
+  const [typingSpeed, setTypingSpeed] = useState(150)
+    const handleTyping = () => {
+      const i = loopNum % phrases.length
+      const fullText = phrases[i]
+    const timer = setTimeout(handleTyping, typingSpeed)
+    <div className="h-16 flex items-center justify-center">
+      <p className="text-2xl font-light tracking-wide bg-gradient-to-r from-purple-400 to-blue-400 text-transparent bg-clip-text">
+        <span className="animate-blink text-blue-400">|</span>
+
+================================
+components/stats-overview.tsx
+================================
+export function StatsOverview() {
+  const stats = getSystemStats();
+    <div className="border-b border-gray-200 p-4 dark:border-gray-800">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+          <Camera className="h-4 w-4" />
+        <p className="text-2xl font-bold">
+          <span className="text-sm text-gray-400">/ {stats.onlineCameras} online</span>
+
+================================
+components/next-logo.tsx
+================================
+export default function NextLogo() {
+
+================================
+components/main-navbar.tsx
+================================
+export default function MainNavbar() {
+    <nav className="w-full flex justify-between items-center mb-8">
+      <Link href="/" className="text-2xl font-bold">
+      <Link href="/" className="text-sm hover:underline">
+
+================================
+components/tutorial/code-block.tsx
+================================
+const CopyIcon = () => (
+const CheckIcon = () => (
+export function CodeBlock({ code }: { code: string }) {
+  const [icon, setIcon] = useState(CopyIcon);
+  const copy = async () => {
+    <pre className="bg-muted rounded-md p-6 my-6 relative">
+        className="absolute right-2 top-2"
+      <code className="text-xs p-3">{code}</code>
+
+================================
+components/tutorial/fetch-data-steps.tsx
+================================
+const create = `create table notes (
+const server = `import { createClient } from '@/utils/supabase/server'
+export default async function Page() {
+  const supabase = createClient()
+  const { data: notes } = await supabase.from('notes').select()
+const client = `'use client'
+export default function Page() {
+  const [notes, setNotes] = useState<any[] | null>(null)
+  const supabase = createClient()
+    const getData = async () => {
+      const { data } = await supabase.from('notes').select()
+export default function FetchDataSteps() {
+    <ol className="flex flex-col gap-6">
+            className="font-bold hover:underline text-foreground/80"
+            className="font-bold hover:underline text-foreground/80"
+          <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+
+================================
+components/tutorial/tutorial-step.tsx
+================================
+export function TutorialStep({
+    <li className="relative">
+        className={`absolute top-[3px] mr-2 peer`}
+        className={`relative text-base text-foreground peer-checked:line-through font-medium`}
+        <span className="ml-8">{title}</span>
+          className={`ml-8 text-sm peer-checked:line-through font-normal text-muted-foreground`}
+
+================================
+components/tutorial/connect-supabase-steps.tsx
+================================
+export default function ConnectSupabaseSteps() {
+    <ol className="flex flex-col gap-6">
+            className="font-bold hover:underline text-foreground/80"
+          <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+          <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+            className="font-bold hover:underline text-foreground/80"
+          <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+
+================================
+components/tutorial/sign-up-user-steps.tsx
+================================
+export default function SignUpUserSteps() {
+    <ol className="flex flex-col gap-6">
+          <p className="mt-4">
+            <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+            <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+          <p className="mt-4">
+              className="text-primary hover:text-foreground"
+          <ul className="mt-4">
+              <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+              <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+              <span className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-xs font-medium text-secondary-foreground border">
+                className="text-primary hover:text-foreground"
+            className="text-primary/50 hover:text-primary flex items-center text-sm gap-1 mt-4"
+            className="font-bold hover:underline text-foreground/80"
+
+================================
+components/supabase-logo.tsx
+================================
+export default function SupabaseLogo() {
+
+================================
+components/particle-background.tsx
+================================
+export default function ParticleBackground() {
+  const particlesInit = useCallback(async (engine: Engine) => {
+
+================================
+components/footer.tsx
+================================
+export default function Footer() {
+    <footer className="w-full bg-black text-white border-t border-white/10">
+      <div className="w-[75%] mx-auto py-16 flex flex-row justify-between gap-10">
+        <div className="flex flex-col gap-4 max-w-[280px]">
+          <h2 className="text-2xl font-bold">
+            Nazar<span className="text-[#206EF6]">AI</span>
+          <p className="text-white/50 text-sm leading-relaxed">
+          <div className="flex items-center gap-2 mt-2">
+            <span className="w-2 h-2 rounded-full bg-[#F46F6F] animate-pulse"></span>
+            <span className="text-[#F46F6F] text-xs font-semibold tracking-wide">LIVE MONITORING</span>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-sm font-semibold text-white/40 uppercase tracking-widest">Product</h3>
+          <ul className="flex flex-col gap-3 text-sm text-white/70">
+            <li><Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link></li>
+            <li><Link href="/cameras" className="hover:text-white transition-colors">Live Cameras</Link></li>
+            <li><Link href="/alerts" className="hover:text-white transition-colors">Alerts</Link></li>
+            <li><Link href="/gallery" className="hover:text-white transition-colors">Gallery</Link></li>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-sm font-semibold text-white/40 uppercase tracking-widest">Detections</h3>
+          <ul className="flex flex-col gap-3 text-sm">
+            <li className="text-[#F46F6F]">Theft & Shoplifting</li>
+            <li className="text-[#F8E082]">Fire & Smoke</li>
+            <li className="text-[#6FF4C6]">Falls</li>
+            <li className="text-[#F59E0B]">Fights & Aggression</li>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-sm font-semibold text-white/40 uppercase tracking-widest">Company</h3>
+          <ul className="flex flex-col gap-3 text-sm text-white/70">
+            <li><Link href="/about" className="hover:text-white transition-colors">About</Link></li>
+              <Link href="https://cal.com/abhishek-kholiya/30min" target="_blank" className="hover:text-white transition-colors">
+            <li><Link href="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+        <div className="flex flex-col gap-4">
+          <h3 className="text-sm font-semibold text-white/40 uppercase tracking-widest">Get Started</h3>
+          <p className="text-white/50 text-sm">Don't wait for incidents. Prevent them.</p>
+            className="mt-2 px-6 py-3 bg-[#206EF6] rounded-xl text-sm font-semibold text-center hover:bg-[#1a5fd4] transition-colors"
+            className="px-6 py-3 rounded-xl border border-white/20 text-sm font-semibold text-center hover:border-white/60 transition-colors"
+      <div className="border-t border-white/10 py-6">
+        <div className="w-[75%] mx-auto flex flex-row items-center justify-between text-white/30 text-xs">
+          <div className="flex gap-6">
+            <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+
+================================
+components/camera-modal.tsx
+================================
+export function CameraModal({ 
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 })
+  const [videoTime, setVideoTime] = useState(currentTime)
+  const camera = locations
+    const updateDimensions = () => {
+  const handleTimeUpdate = () => {
+      <DialogContent className="max-w-5xl bg-black p-0">
+        <div className="relative aspect-[4/3]">
+            className="absolute inset-0 h-full w-full object-cover"
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+          <div className="absolute left-0 right-0 top-0 flex items-center justify-between p-4">
+            <div className="flex items-center gap-2">
+              <Signal className="h-4 w-4 text-green-400" />
+              <Battery className="h-4 w-4 text-green-400" />
+              <div className="flex items-center gap-2 rounded-full bg-red-500/20 px-3 py-1 text-sm text-red-500 backdrop-blur-sm">
+                <AlertTriangle className="h-4 w-4" />
+          <div className="absolute bottom-0 left-0 right-0 p-4">
+            <div className="flex items-center justify-between">
+                <div className="text-sm font-medium text-white">{camera.location}</div>
+                <div className="text-xs text-white/60">{camera.address}</div>
+              <div className="text-sm text-white/60">
+
+================================
+components/deploy-button.tsx
+================================
+export default function DeployButton() {
+        <Button className="flex items-center gap-2" size={"sm"}>
+            className="h-3 w-3"
+
+================================
+components/header-nav.tsx
+================================
+export async function HeaderNav() {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+    const navItems = [
+        <div className="hidden md:flex items-center gap-2">
+            <Button key={item.href} asChild variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+              <Link href={item.href} className="flex items-center gap-2">
+                <item.icon className="h-4 w-4" />
+                <span className="hidden lg:inline">{item.label}</span>
+        <div className="flex md:hidden items-center mr-2">
+              <Button variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10">
+                <Menu className="h-5 w-5" />
+            <DropdownMenuContent align="start" className="w-48 bg-black/90 border-white/10 text-white backdrop-blur-md">
+                <DropdownMenuItem key={item.href} asChild className="focus:bg-white/10 focus:text-white cursor-pointer">
+                  <Link href={item.href} className="flex items-center gap-3 w-full py-2 px-2">
+                    <item.icon className="h-4 w-4" />
+    <div className="flex items-center gap-2 sm:gap-6">
+      <Button asChild variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+          <span className="text-xs sm:text-sm">Detection</span>
+      <Button asChild variant="ghost" size="sm" className="hidden xs:flex text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+          <span className="text-xs sm:text-sm">Book Demo</span>
+      <Button asChild variant="ghost" size="sm" className="text-white/70 hover:text-white hover:bg-white/10 transition-colors">
+          <span className="text-xs sm:text-sm">Get Started</span>
+
+================================
+components/video-player.tsx
+================================
+const VideoPlayer = forwardRef<HTMLVideoElement, VideoPlayerProps>(({ url, timestamps }, ref) => {
+    <div className="aspect-video rounded-lg overflow-hidden bg-zinc-900">
+        className="w-full h-full" 
+          const video = e.target as HTMLVideoElement;
+export default VideoPlayer
+
+================================
+components/camera-feed.tsx
+================================
+export function CameraFeed({ camera, date = new Date(), onTimeUpdate }: CameraFeedProps) {
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 })
+  const [currentTime, setCurrentTime] = useState(0)
+    const updateDimensions = () => {
+  const handleTimeUpdate = () => {
+      const time = videoRef.current.currentTime
+    <div className="group relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
+        className="absolute inset-0 h-full w-full object-cover"
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+      <div className="absolute left-0 right-0 top-0 flex items-center justify-between p-4">
+        <div className="flex items-center gap-2 text-green-400">
+          <Wifi className="h-4 w-4" />
+          <Battery className="h-4 w-4" />
+        <div className="rounded-full bg-white/20 p-1.5 backdrop-blur-sm">
+          <MoreHorizontal className="h-4 w-4 text-white" />
+      <div className="absolute bottom-0 left-0 right-0 p-4">
+        <div className="flex items-center justify-between">
+            <div className="text-sm font-medium text-white">{camera.location}</div>
+            <div className="text-xs text-white/60">{camera.address}</div>
+
+================================
+components/typography/inline-code.tsx
+================================
+export function TypographyInlineCode() {
+    <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold">
+
+================================
+components/navigation-events.tsx
+================================
+function NavigationEventsInternal() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+    const timer = setTimeout(() => {
+export function NavigationEvents() {
+
+================================
+components/boundingBoxDrawer.tsx
+================================
+const BoundingBoxDrawer = ({ imageUrl, boxes }: BoundingBoxDrawerProps) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+    const image = new Image();
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+        const maxDimension = 640;
+        const colors = [
+        const xScale = width / image.width;
+        const yScale = height / image.height;
+          const color = colors[i % colors.length];
+export default BoundingBoxDrawer;
+
+================================
+components/ui/dropdown-menu.tsx
+================================
+const DropdownMenu = DropdownMenuPrimitive.Root;
+const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
+const DropdownMenuGroup = DropdownMenuPrimitive.Group;
+const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
+const DropdownMenuSub = DropdownMenuPrimitive.Sub;
+const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup;
+const DropdownMenuSubTrigger = React.forwardRef<
+>(({ className, inset, children, ...props }, ref) => (
+    className={cn(
+      className,
+    <ChevronRight className="ml-auto h-4 w-4" />
+const DropdownMenuSubContent = React.forwardRef<
+>(({ className, ...props }, ref) => (
+    className={cn(
+      className,
+const DropdownMenuContent = React.forwardRef<
+>(({ className, sideOffset = 4, ...props }, ref) => (
+      className={cn(
+        className,
+const DropdownMenuItem = React.forwardRef<
+>(({ className, inset, ...props }, ref) => (
+    className={cn(
+      className,
+const DropdownMenuCheckboxItem = React.forwardRef<
+>(({ className, children, checked, ...props }, ref) => (
+    className={cn(
+      className,
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+        <Check className="h-4 w-4" />
+const DropdownMenuRadioItem = React.forwardRef<
+>(({ className, children, ...props }, ref) => (
+    className={cn(
+      className,
+    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center">
+        <Circle className="h-2 w-2 fill-current" />
+const DropdownMenuLabel = React.forwardRef<
+>(({ className, inset, ...props }, ref) => (
+    className={cn(
+      className,
+const DropdownMenuSeparator = React.forwardRef<
+
+================================
+components/ui/dialog.tsx
+================================
+const Dialog = DialogPrimitive.Root
+const DialogTrigger = DialogPrimitive.Trigger
+const DialogPortal = DialogPrimitive.Portal
+const DialogClose = DialogPrimitive.Close
+const DialogOverlay = React.forwardRef<
+>(({ className, ...props }, ref) => (
+    className={cn(
+      className
+const DialogContent = React.forwardRef<
+>(({ className, children, ...props }, ref) => (
+      className={cn(
+        className
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+        <X className="h-4 w-4" />
+        <span className="sr-only">Close</span>
+const DialogHeader = ({
+  className,
+    className={cn(
+      className
+const DialogFooter = ({
+  className,
+    className={cn(
+      className
+const DialogTitle = React.forwardRef<
+>(({ className, ...props }, ref) => (
+    className={cn(
+      className
+const DialogDescription = React.forwardRef<
+>(({ className, ...props }, ref) => (
+    className={cn("text-sm text-muted-foreground", className)}
+export {
+
+================================
+components/ui/progress.tsx
+================================
+const Progress = React.forwardRef<
+>(({ className, value, ...props }, ref) => (
+  <ProgressPrimitive.Root ref={ref} className="relative h-2 w-full overflow-hidden rounded-full bg-zinc-800" {...props}>
+      className="h-full w-full flex-1 bg-purple-600 transition-all"
+export { Progress }
+
+================================
+components/ui/label.tsx
+================================
+import { cva, type VariantProps } from "class-variance-authority";
+const labelVariants = cva(
+const Label = React.forwardRef<
+>(({ className, ...props }, ref) => (
+    className={cn(labelVariants(), className)}
+export { Label };
+
+================================
+components/ui/visually-hidden.tsx
+================================
+const VisuallyHidden = React.forwardRef<
+>(({ className, ...props }, ref) => {
+      className={cn(
+        className
+export { VisuallyHidden }
+
+================================
+components/ui/badge.tsx
+================================
+import { cva, type VariantProps } from "class-variance-authority";
+const badgeVariants = cva(
+export interface BadgeProps
+function Badge({ className, variant, ...props }: BadgeProps) {
+    <div className={cn(badgeVariants({ variant }), className)} {...props} />
+export { Badge, badgeVariants };
+
+================================
+components/ui/uploadFileButton.tsx
+================================
+const UploadFileButton = () => {
+  const [fileName, setFileName] = useState("")
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    <div className="relative z-10">
+        className="flex items-center justify-center w-64 px-4 py-3 text-black bg-white rounded-md shadow-lg hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-white transition-colors"
+          <span className="truncate">{fileName}</span>
+            <Upload className="mr-2 h-5 w-5" />
+      <input type="file" ref={fileInputRef} onChange={handleUpload} accept="video/*" className="hidden" />
+export default UploadFileButton
+
+================================
+components/ui/checkbox.tsx
+================================
+const Checkbox = React.forwardRef<
+>(({ className, ...props }, ref) => (
+    className={cn(
+      className,
+      className={cn("flex items-center justify-center text-current")}
+      <Check className="h-4 w-4" />
+export { Checkbox };
+
+================================
+components/ui/button.tsx
+================================
+import { cva, type VariantProps } from "class-variance-authority";
+const buttonVariants = cva(
+export interface ButtonProps
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button";
+        className={cn(buttonVariants({ variant, size, className }))}
+export { Button, buttonVariants };
+
+================================
+components/ui/input.tsx
+================================
+export interface InputProps
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, ...props }, ref) => {
+        className={cn(
+          className,
+export { Input };
+
+================================
+components/hero.tsx
+================================
+export default function Header() {
+    <div className="flex flex-col gap-16 items-center">
+      <div className="flex gap-8 justify-center items-center">
+        <span className="border-l rotate-45 h-6" />
+      <h1 className="sr-only">Supabase and Next.js Starter Template</h1>
+      <p className="text-3xl lg:text-4xl !leading-tight mx-auto max-w-xl text-center">
+          className="font-bold hover:underline"
+          className="font-bold hover:underline"
+      <div className="w-full p-[1px] bg-gradient-to-r from-transparent via-foreground/10 to-transparent my-8" />
+
+================================
+components/header-auth.tsx
+================================
+export default async function AuthButton() {
+  const supabase = await createClient();
+        <div className="flex gap-4 items-center">
+              className="font-normal pointer-events-none"
+          <div className="flex gap-2">
+              className="opacity-75 cursor-none pointer-events-none"
+              className="opacity-75 cursor-none pointer-events-none"
+    <div className="flex items-center gap-4 text-white/90">
+      <span className="hidden sm:inline-block text-sm">Hey, {user.email}!</span>
+        <Button type="submit" variant={"outline"} size="sm" className="border-white/10 hover:bg-white/10 text-white transition-all">
+    <div className="flex gap-3">
+      <Button asChild size="sm" variant={"ghost"} className="text-white/70 hover:text-white hover:bg-white/10 transition-all">
+      <Button asChild size="sm" variant={"default"} className="bg-white text-black hover:bg-white/90 transition-all font-medium">
+
+================================
+components/event-feed.tsx
+================================
+const INCIDENT_TYPES = {
+const getIncidentIcon = (type: string) => {
+  const normalizedType = type.toLowerCase()
+const formatTimeAgo = (addedAt: number, currentTime: number) => {
+  const secondsAgo = Math.floor((currentTime - addedAt) / 1000)
+  const minutesAgo = Math.floor(secondsAgo / 60)
+export function EventFeed({ events, videoTimes, onEventHover, onEventClick }: EventFeedProps) {
+  const [visibleEvents, setVisibleEvents] = useState<VisibleEvent[]>([])
+  const [lastEventTime, setLastEventTime] = useState(0)
+  const [currentTime, setCurrentTime] = useState(Date.now())
+  const [selectedEventForAlert, setSelectedEventForAlert] = useState<string | null>(null)
+    const timer = setInterval(() => {
+  const processNewEvents = useCallback((newEvents: Event[]) => {
+    const now = Date.now()
+    const randomEvent = newEvents[Math.floor(Math.random() * newEvents.length)]
+    const eventWithTimestamp = { ...randomEvent, addedAt: now }
+      const combined = [eventWithTimestamp, ...prev]
+      const unique = Array.from(new Map(combined.map(e => [e.id, e])).values())
+    const newEvents = events.filter(event => {
+      const videoTime = videoTimes[event.camera.id] || 0
+      const eventTimeInSeconds = event.timestamp.getTime() / 1000
+  const handleDismiss = (eventId: string) => {
+    <div className="relative flex flex-col space-y-4">
+      <h2 className="text-2xl font-bold text-white tracking-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.7)]">Recent Incidents</h2>
+          const { icon: Icon, color, bg } = getIncidentIcon(event.type)
+              className="relative rounded-lg border bg-card text-card-foreground shadow-sm"
+              <div className="p-4">
+                <div className="flex items-center gap-4">
+                  <div className={cn("p-2 rounded-full", bg)}>
+                    <Icon className={cn("h-4 w-4", color)} />
+                  <div className="flex-1 space-y-1">
+                    <p className="font-medium leading-none">{event.camera.name}</p>
+                    <p className={cn("text-sm", color)}>{event.type}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{event.description}</p>
+                  <div className="flex items-center gap-1 text-sm text-gray-500">
+                    <Clock className="h-3 w-3" />
+                <div className="mt-3 flex items-center gap-1 text-xs text-gray-500">
+                  <MapPin className="h-3 w-3" />
+                <div className="mt-4 flex gap-2">
+                    className={cn(
+
+================================
+components/env-var-warning.tsx
+================================
+export function EnvVarWarning() {
+    <div className="flex gap-4 items-center">
+      <Badge variant={"outline"} className="font-normal">
+      <div className="flex gap-2">
+          className="opacity-75 cursor-none pointer-events-none"
+          className="opacity-75 cursor-none pointer-events-none"
+
+================================
+components/submit-button.tsx
+================================
+export function SubmitButton({
+  const { pending } = useFormStatus();
+
+================================
+components/date-picker.tsx
+================================
+export function DatePicker({ selectedDate, onDateChange }: DatePickerProps) {
+  const dates = Array.from({ length: 7 }, (_, i) => addDays(new Date(), i - 3))
+    <div className="flex items-center justify-between px-4 py-2">
+      <button className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
+        <ChevronLeft className="h-5 w-5" />
+      <div className="flex gap-1">
+          const isSelected = date.toDateString() === selectedDate.toDateString()
+              className={`flex flex-col items-center rounded-lg px-3 py-1 text-sm ${
+              <span className="text-xs opacity-60">{format(date, "EEE").slice(0, 3)}</span>
+              <span className="font-medium">{format(date, "dd")}</span>
+      <button className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800">
+        <ChevronRight className="h-5 w-5" />
+
+================================
+components/security-alert-modal.tsx
+================================
+export function SecurityAlertModal({
+  const [status, setStatus] = useState<"calling" | "alerted">("calling")
+      const timer = setTimeout(() => {
+          <DialogTitle className="text-center">
+        <div className="flex flex-col items-center justify-center py-8">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
+            <ShieldCheck className="h-12 w-12 text-green-500" />
+              className="w-full rounded-md bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+
+================================
+components/home-link.tsx
+================================
+export default function HomeLink() {
+  const router = useRouter()
+  const handleClick = async (e: React.MouseEvent) => {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+      className="flex items-center"
+        className="object-contain"
+
+================================
+components/timestamp-list.tsx
+================================
+export default function TimestampList({ timestamps, onTimestampClick }: TimestampListProps) {
+  const [expandedItems, setExpandedItems] = useState<number[]>([])
+  const [longDescriptions, setLongDescriptions] = useState<number[]>([])
+  const textRefs = useRef<(HTMLParagraphElement | null)[]>([])
+    const checkTextOverflow = () => {
+      const longItems = timestamps
+          const textElement = textRefs.current[index]
+          const hasOverflow = (
+    const timeoutId = setTimeout(checkTextOverflow, 100)
+    const handleResize = () => {
+  const toggleExpand = (index: number, e: React.MouseEvent | React.KeyboardEvent) => {
+    <div className="grid gap-4">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-2 px-1">
+        <h2 className="text-xl font-bold text-white tracking-tight">Key Moments</h2>
+        <div className="flex gap-4 text-xs font-medium">
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-green-500/10 rounded-full border border-green-500/20">
+            <Shield className="h-3.5 w-3.5 text-green-400" />
+            <span className="text-green-400/80 uppercase tracking-wider">Safe</span>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-red-500/10 rounded-full border border-red-500/20">
+            <ShieldAlert className="h-3.5 w-3.5 text-red-400" />
+            <span className="text-red-400/80 uppercase tracking-wider">Danger</span>
+      <div className="grid gap-3">
+            className={`group w-full justify-start gap-3 h-auto py-4 px-4 transition-all duration-300 ${
+            <div className={`absolute left-0 top-0 bottom-0 w-1.5 transition-all duration-300 ${
+            <div className="shrink-0 p-2 rounded-xl bg-black/20">
+                <ShieldAlert className="h-5 w-5 text-red-400 animate-pulse" />
+                <Shield className="h-5 w-5 text-green-400" />
+            <div className="flex flex-col items-start w-full min-w-0 pr-2">
+              <div className="flex items-center gap-3 w-full mb-1">
+                <span className="font-mono text-sm sm:text-base font-bold text-white tracking-tighter bg-white/5 py-0.5 px-2 rounded-lg">{item.timestamp}</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-red-500/20 text-red-400 border border-red-500/30 uppercase tracking-widest">
+              <div className="w-full">
+                  className={`relative text-xs sm:text-sm leading-relaxed transition-all duration-200 ${longDescriptions.includes(index) ? 'cursor-pointer' : ''}`}
+                    className={`whitespace-pre-wrap break-words ${expandedItems.includes(index) ? '' : 'line-clamp-2'} ${
+                      className={`flex items-center gap-1 text-[10px] sm:text-xs mt-1.5 font-bold uppercase tracking-widest cursor-pointer ${item.isDangerous ? 'text-red-400 hover:text-red-300' : 'text-zinc-500 hover:text-zinc-300'} transition-colors`}
+                          <ChevronUp className="h-3 w-3" />
+                          <ChevronDown className="h-3 w-3" />
+          <div className="flex flex-col items-center justify-center py-10 px-4 bg-zinc-900/20 border border-white/5 rounded-2xl border-dashed">
+            <Clock className="h-8 w-8 text-zinc-700 mb-2" />
+            <p className="text-zinc-500 text-sm italic">No events detected yet</p>
+
+================================
+components/form-message.tsx
+================================
+export type Message =
+export function FormMessage({ message }: { message: Message }) {
+    <div className="flex flex-col gap-2 w-full max-w-md text-sm">
+        <div className="text-foreground border-l-2 border-foreground px-4">
+        <div className="text-destructive-foreground border-l-2 border-destructive-foreground px-4">
+        <div className="text-foreground border-l-2 px-4">{message.message}</div>
+
+================================
+components/chat-interface.tsx
+================================
+  className?: string
+export default function ChatInterface({ timestamps, className = '' }: ChatInterfaceProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const scrollToBottom = () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    const userMessage = { content: input, role: 'user' as const }
+      const response = await fetch('/api/chat', {
+        const errorData = await response.json()
+      const data = await response.json()
+        className={`fixed bottom-4 right-4 rounded-full p-4 bg-purple-600 hover:bg-purple-700 shadow-lg z-50 ${className}`}
+        <MessageCircle className="w-6 h-6" />
+    <div className={`fixed bottom-4 right-4 w-96 h-[500px] bg-zinc-900/95 backdrop-blur-sm rounded-lg shadow-xl border border-zinc-800 flex flex-col z-50 ${className}`}>
+      <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-900">
+        <h3 className="font-semibold text-white">Hawk Assistance</h3>
+          className="h-8 w-8 rounded-full hover:bg-zinc-800"
+          <X className="h-4 w-4" />
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`max-w-[80%] rounded-lg px-4 py-2 ${
+          <div className="flex justify-start">
+            <div className="bg-zinc-800 rounded-lg px-4 py-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+      <form onSubmit={handleSubmit} className="p-4 border-t border-zinc-800 bg-zinc-900">
+        <div className="flex gap-2">
+            className="flex-1 bg-zinc-800 border-zinc-700 text-white"
+            className="bg-purple-600 hover:bg-purple-700"
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Send'}
+
