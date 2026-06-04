@@ -86,8 +86,6 @@ export default function Page() {
   const lastDescriptionRef   = useRef<{ text: string; time: number }>({ text: '', time: 0 })
   const recordingStateRef    = useRef<'NORMAL' | 'SUSPICIOUS' | 'DANGER'>('NORMAL')
   const gptCallCountRef      = useRef(0)
-  const frameCounterRef      = useRef(0)       // counts analyzeFrame calls for embedding
-  const lastForcedGptRef     = useRef(0)       // timestamp of last forced GPT call
   const framesEvaluatedRef   = useRef(0)
   const framesBlockedRef     = useRef(0)
   // -----------------------------
@@ -395,16 +393,6 @@ export default function Page() {
     if (!canvasRef.current) return
 
     framesEvaluatedRef.current++
-    frameCounterRef.current++
-
-    // Capture timestamp NOW (before async GPT call) — fixes the timestamp bug
-    const capturedTimestamp = (() => {
-      if (!startTimeRef.current) return "00:00"
-      const elapsed = Math.floor((Date.now() - startTimeRef.current.getTime()) / 1000)
-      const m = Math.floor(elapsed / 60)
-      const s = elapsed % 60
-      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-    })()
 
     const hints = {
       poseKeypoints:     lastPoseKeypoints,
@@ -415,18 +403,9 @@ export default function Page() {
       frameHeight:       canvasRef.current.height,
     }
 
-    // ── 30s forced GPT fallback — catches silent collapses ──────────────
-    const now30 = Date.now()
-    const forcedGpt = now30 - lastForcedGptRef.current > 30000
-    if (forcedGpt) {
-      lastForcedGptRef.current = now30
-      console.log('[FILTER] ⏰ 30s forced GPT call')
-    }
-
     const { send, score, reason, debug } = frameFilter.evaluate(canvasRef.current, hints)
-    const shouldSend = send || forcedGpt
 
-    if (!shouldSend) {
+    if (!send) {
       framesBlockedRef.current++
       if (framesEvaluatedRef.current % 10 === 0) {
         setFilterStats({
@@ -437,24 +416,6 @@ export default function Page() {
       }
       console.log(`[FILTER] ⚪ DROP reason=${reason} score=${score}`)
       return
-    }
-
-    // ── Every 4th frame → send to embedder (async, non-blocking) ────────
-    if (frameCounterRef.current % 4 === 0 && lastPoseKeypoints.length > 0) {
-      captureFrame().then(f => {
-        if (f) {
-           fetch('/api/embed', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({
-               imageBase64: f,
-               timestamp: capturedTimestamp,
-               cameraId: 'cam-0',
-               description: transcriptRef.current || 'No description',
-             }),
-           }).catch(() => {}) // fire-and-forget, embedder may not be running
-        }
-      })
     }
 
     const frame = await captureFrame()
@@ -474,99 +435,66 @@ export default function Page() {
       faceConfidence: faceConfidenceRef.current,
     }
 
-try {
-  const result = await detectEvents(frame, transcriptRef.current, tensorflowData)
-  if (!isRecordingRef.current) return
-  if (!result?.events?.length) return
+    try {
+      const result = await detectEvents(frame, transcriptRef.current, tensorflowData)
+      if (!isRecordingRef.current) return
+      if (!result?.events?.length) return
 
-  for (const event of result.events) {
-    // Dedup: skip if same description within 30s
-    const now = Date.now()
-    const isSimilar =
-      lastDescriptionRef.current.text.length > 10 &&
-      now - lastDescriptionRef.current.time < 30000 &&
-      event.description.toLowerCase().includes(
-        lastDescriptionRef.current.text.toLowerCase().slice(0, 20)
-      )
-    if (isSimilar) { console.log('[DEDUP] skipped:', event.description); continue }
-    lastDescriptionRef.current = { text: event.description, time: now }
+      for (const event of result.events) {
+        // Dedup: skip if same description within 30s
+        const now = Date.now()
+        const isSimilar =
+          lastDescriptionRef.current.text.length > 10 &&
+          now - lastDescriptionRef.current.time < 30000 &&
+          event.description.toLowerCase().includes(
+            lastDescriptionRef.current.text.toLowerCase().slice(0, 20)
+          )
+        if (isSimilar) { console.log('[DEDUP] skipped:', event.description); continue }
+        lastDescriptionRef.current = { text: event.description, time: now }
 
-    // State machine
-    recordingStateRef.current = event.isDangerous ? 'DANGER' : score > 30 ? 'SUSPICIOUS' : 'NORMAL'
+        // State machine
+        recordingStateRef.current = event.isDangerous ? 'DANGER' : score > 30 ? 'SUSPICIOUS' : 'NORMAL'
 
-    // Skip non-events
-    if (/scene normal|no event|person (visible|standing|partially|in shadow)/i.test(event.description) && !event.isDangerous) {
-      console.log('[FILTER] non-event skipped:', event.description)
-      continue
-    }
-
-    const newTimestamp = {
-      timestamp:   capturedTimestamp,
-      description: event.description,
-      isDangerous: event.isDangerous,
-    }
-    setTimestamps(prev => [...prev, newTimestamp])
-
-    // Embed every event frame (dangerous or suspicious)
-    if (event.isDangerous || recordingStateRef.current === 'SUSPICIOUS') {
-      console.log('[EMBED] Sending event frame to embedder:', {
-        description: event.description,
-        timestamp: capturedTimestamp,
-        isDangerous: event.isDangerous,
-        isSuspicious: recordingStateRef.current === 'SUSPICIOUS',
-      })
-      fetch('/api/embed', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          imageBase64: frame,
-          timestamp: capturedTimestamp,
-          cameraId: 'cam-0',
-          description: event.description || transcriptRef.current || 'No description',
-        }),
-      })
-      .then(async (res) => {
-        if (res.ok) {
-          console.log('[EMBED] Frame successfully embedded.')
-        } else {
-          const err = await res.text()
-          console.error('[EMBED] Embedder returned error:', err)
+        // Skip non-events
+        if (/scene normal|no event|person (visible|standing|partially|in shadow)/i.test(event.description) && !event.isDangerous) {
+          console.log('[FILTER] non-event skipped:', event.description)
+          continue
         }
-      })
-      .catch((err) => {
-        console.error('[EMBED] Failed to call embedder:', err)
-      })
-    } else {
-      console.log('[EMBED] Event not embedded (not dangerous/suspicious):', event.description)
-    }
 
-    if (event.isDangerous) {
-      const payload = {
-        title:       'Dangerous Activity Detected',
-        description: `At ${newTimestamp.timestamp}: ${event.description}`,
-        timestamp:   newTimestamp.timestamp,
-        imageBase64: frame,
+        const newTimestamp = {
+          timestamp:   getElapsedTime(),
+          description: event.description,
+          isDangerous: event.isDangerous,
+        }
+        setTimestamps(prev => [...prev, newTimestamp])
+
+        if (event.isDangerous) {
+          const payload = {
+            title:       'Dangerous Activity Detected',
+            description: `At ${newTimestamp.timestamp}: ${event.description}`,
+            timestamp:   newTimestamp.timestamp,
+            imageBase64: frame,
+          }
+          try {
+            const r = await fetch('/api/send-telegram', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+            r.ok ? console.log('✅ Telegram') : console.error('❌ Telegram', await r.json())
+          } catch(e) { console.error('❌ Telegram', e) }
+          try {
+            const r = await fetch('/api/send-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
+            r.ok ? console.log('✅ WhatsApp') : console.error('❌ WhatsApp', await r.json())
+          } catch(e) { console.error('❌ WhatsApp', e) }
+          try {
+            const r = await fetch('/api/send-email', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ title: payload.title, description: payload.description }) })
+            if (!r.ok) { setError(r.status===401?'Sign in for email alerts.':'Email service error.'); continue }
+            console.log('✅ Email', await r.json())
+          } catch(e) { console.error('❌ Email', e) }
+        }
       }
-      try {
-        const r = await fetch('/api/send-telegram', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
-        r.ok ? console.log('✅ Telegram') : console.error('❌ Telegram', await r.json())
-      } catch(e) { console.error('❌ Telegram', e) }
-      try {
-        const r = await fetch('/api/send-whatsapp', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) })
-        r.ok ? console.log('✅ WhatsApp') : console.error('❌ WhatsApp', await r.json())
-      } catch(e) { console.error('❌ WhatsApp', e) }
-      try {
-        const r = await fetch('/api/send-email', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ title: payload.title, description: payload.description }) })
-        if (!r.ok) { setError(r.status===401?'Sign in for email alerts.':'Email service error.'); continue }
-        console.log('✅ Email', await r.json())
-      } catch(e) { console.error('❌ Email', e) }
+    } catch (err) {
+      console.error('analyzeFrame error:', err)
+      setError('Error analyzing frame.')
+      if (isRecordingRef.current) stopRecording()
     }
-  }
-} catch (err) {
-  console.error('analyzeFrame error:', err)
-  setError('Error analyzing frame.')
-  if (isRecordingRef.current) stopRecording()
-}
   }
   // -----------------------------
   // 6) Capture current video frame (for analysis)

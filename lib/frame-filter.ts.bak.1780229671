@@ -17,12 +17,12 @@ export interface FilterConfig {
 }
 
 export const DEFAULT_CONFIG: FilterConfig = {
-  motionThreshold: 0.02,
+  motionThreshold: 0.06,
   motionBaselineFrames: 30,
-  anomalyThreshold: 22,
-  cooldownMs: 6000,
-  fallFramesRequired: 2,
-  warmupMs: 1500,
+  anomalyThreshold: 50,
+  cooldownMs: 8000,
+  fallFramesRequired: 3,
+  warmupMs: 5000,
 }
 
 // ─── Input shape — matches what page.tsx already computes ───────────────────
@@ -274,9 +274,9 @@ export class FrameFilter {
     let s = 0
     s += Math.min(f.relativeMotion * 12, 30)  // above-normal motion for this camera
     if (f.suddenMovement) s += 25              // velocity spike — lunge, fight
-    if (f.likelyFall)     s += 45             // confirmed fall (N frames)
-    else if (f.bodyLow)   s += 25             // partial fall signal
-    if (f.noFaceButBody)  s += 18              // person down / turned away (reduced: dark room FP)
+    if (f.likelyFall)     s += 30             // confirmed fall (N frames)
+    else if (f.bodyLow)   s += 10             // partial fall signal
+    if (f.noFaceButBody)  s += 8              // person down / turned away (reduced: dark room FP)
     if (f.audioKeyword)   s += 30             // shouting keywords
     if (f.poseCount < 5 && f.poseCount > 0) s += 10  // person obscured
     return Math.min(Math.round(s), 100)

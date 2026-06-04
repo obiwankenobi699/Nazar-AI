@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Video, PlaySquare, FolderOpen, BarChart2, Menu } from "lucide-react"
+import { Video, PlaySquare, FolderOpen, BarChart2, Menu , Search } from "lucide-react"
 import { Button } from "./ui/button"
 import { createClient } from "@/utils/supabase/server"
 import {
@@ -18,6 +18,7 @@ export async function HeaderNav() {
       { href: "/pages/upload", label: "Upload", icon: Video },
       { href: "/pages/realtimeStreamPage", label: "Realtime", icon: PlaySquare },
       { href: "/pages/saved-videos", label: "Library", icon: FolderOpen },
+      { href: "/pages/search", label: "Search", icon: Search },
       { href: "/pages/statistics", label: "Statistics", icon: BarChart2 },
     ];
 
