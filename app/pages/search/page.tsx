@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Search, Database, Loader2, AlertCircle, Clock, Trash2, RefreshCw } from "lucide-react"
+import { Trash2, RefreshCw } from "lucide-react"
 import { ChatMessage } from "@/components/ChatMessage"
 import { ChatInput } from "@/components/ChatInput"
 
@@ -33,51 +33,42 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false)
   const [stats, setStats] = useState<{ total_frames: number; model: string } | null>(null)
   const [clearing, setClearing] = useState(false)
-  const mainRef = useRef<HTMLDivElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
 
   const fetchStats = () => {
-    fetch('/api/search')
-      .then(r => r.json())
-      .then(d => { if (!d.error) setStats(d) })
+    fetch("/api/search")
+      .then((r) => r.json())
+      .then((d) => { if (!d.error) setStats(d) })
       .catch(() => {})
   }
 
-  useEffect(() => {
-    fetchStats()
-  }, [])
+  useEffect(() => { fetchStats() }, [])
 
   useEffect(() => {
-    if (mainRef.current) {
-      mainRef.current.scrollTop = mainRef.current.scrollHeight
-    }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatHistory])
 
   const handleSearch = async (query: string) => {
     if (!query.trim()) return
-    setChatHistory(prev => [...prev, { type: "query", content: query }])
+    setChatHistory((prev) => [...prev, { type: "query", content: query }])
     setLoading(true)
-    setChatHistory(prev => [...prev, { type: "loading", content: "Loading..." }])
+    setChatHistory((prev) => [...prev, { type: "loading", content: "" }])
     try {
-      const res = await fetch('/api/search', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query, topK: 9 }),
       })
       const data = await res.json()
-      setChatHistory(prev => {
-        // Remove last loading entry
-        const withoutLoading = prev.filter(entry => entry.type !== "loading")
-        if (!res.ok) {
-          return [...withoutLoading, { type: "error", content: data.error || "Search failed" }]
-        }
-        if (!data.results?.length) {
-          return [...withoutLoading, { type: "error", content: "No matching frames found." }]
-        }
+      setChatHistory((prev) => {
+        const withoutLoading = prev.filter((e) => e.type !== "loading")
+        if (!res.ok) return [...withoutLoading, { type: "error", content: data.error || "Search failed" }]
+        if (!data.results?.length) return [...withoutLoading, { type: "error", content: "No matching frames found." }]
         return [...withoutLoading, { type: "result", content: data.results, query }]
       })
     } catch {
-      setChatHistory(prev => {
-        const withoutLoading = prev.filter(entry => entry.type !== "loading")
+      setChatHistory((prev) => {
+        const withoutLoading = prev.filter((e) => e.type !== "loading")
         return [...withoutLoading, { type: "error", content: "Search failed — is the embedder running?" }]
       })
     } finally {
@@ -87,66 +78,95 @@ export default function SearchPage() {
   }
 
   const handleClear = async () => {
-    if (!confirm('Clear all indexed frames?')) return
+    if (!confirm("Clear all indexed frames?")) return
     setClearing(true)
     try {
-      await fetch('/api/search', { method: 'DELETE' })
+      await fetch("/api/search", { method: "DELETE" })
       setChatHistory([])
       fetchStats()
     } catch {
-      setChatHistory(prev => [...prev, { type: "error", content: "Could not clear" }])
+      setChatHistory((prev) => [...prev, { type: "error", content: "Could not clear" }])
     } finally {
       setClearing(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
-      <header className="p-6 border-b border-zinc-700">
-        <h1 className="text-3xl font-bold drop-shadow-[0_0_10px_rgba(255,255,255,0.4)]">Footage Search</h1>
-        <p className="text-zinc-500 text-sm mt-1">Semantic search over recorded frames · powered by local Ollama embeddings</p>
-        <div className="flex items-center justify-between mt-4 text-xs font-mono text-zinc-500">
-          {stats ? (
-            <>
-              <span><span className="text-white">{stats.total_frames}</span> frames indexed</span>
-              <span>model <span className="text-purple-400">{stats.model}</span></span>
-            </>
-          ) : (
-            <span className="text-zinc-600">checking embedder...</span>
+    <div className="flex flex-col h-screen bg-[#0f0f0f] text-white">
+
+      {/* ── Slim top bar ── */}
+      <div className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 border-b border-white/[0.06]">
+        <div className="flex items-center gap-2.5">
+          <span className="text-sm font-semibold text-white/90 tracking-tight">Footage Search</span>
+          {stats && (
+            <span className="text-xs text-white/30 font-mono">
+              {stats.total_frames} frames · {stats.model}
+            </span>
           )}
-          <div className="flex gap-2">
-            <button onClick={fetchStats} className="text-zinc-600 hover:text-zinc-400 p-1">
-              <RefreshCw className="w-4 h-4" />
-            </button>
-            {stats && stats.total_frames > 0 && (
-              <button onClick={handleClear} disabled={clearing}
-                className="text-zinc-600 hover:text-red-400 p-1 transition-colors">
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
-          </div>
         </div>
-      </header>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={fetchStats}
+            className="p-1.5 rounded-md text-white/20 hover:text-white/50 hover:bg-white/5 transition-all"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+          {stats && stats.total_frames > 0 && (
+            <button
+              onClick={handleClear}
+              disabled={clearing}
+              className="p-1.5 rounded-md text-white/20 hover:text-red-400/70 hover:bg-red-400/5 transition-all disabled:opacity-30"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
 
-      <main
-        ref={mainRef}
-        className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-2"
-      >
-        {chatHistory.length === 0 && (
-          <div className="flex flex-wrap gap-2 mb-8 justify-center">
-            {EXAMPLE_QUERIES.map(q => (
-              <button key={q} onClick={() => handleSearch(q)}
-                className="text-xs px-3 py-1.5 bg-zinc-900/60 border border-white/5 rounded-full text-zinc-400 hover:text-white hover:border-white/20 transition-colors">
-                {q}
-              </button>
-            ))}
-          </div>
-        )}
-        {chatHistory.map((entry, idx) => (
-          <ChatMessage key={idx} type={entry.type} content={entry.content} query={entry.query} />
-        ))}
-      </main>
+      {/* ── Scrollable message area ── */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-3xl mx-auto px-4 py-8 flex flex-col gap-8">
 
+          {/* Empty / welcome state */}
+          {chatHistory.length === 0 && (
+            <div className="flex flex-col items-center justify-center min-h-[55vh] gap-8 text-center">
+              <div>
+                <p className="text-2xl font-semibold text-white/80 mb-2 tracking-tight">
+                  What are you looking for?
+                </p>
+                <p className="text-sm text-white/30 max-w-xs mx-auto leading-relaxed">
+                  Describe a scene or behaviour — AI will find matching frames from your footage.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {EXAMPLE_QUERIES.map((q) => (
+                  <button
+                    key={q}
+                    onClick={() => handleSearch(q)}
+                    className="text-xs px-4 py-2 rounded-full border border-white/10 text-white/40 hover:text-white/80 hover:border-white/25 hover:bg-white/5 transition-all"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Messages */}
+          {chatHistory.map((entry, idx) => (
+            <ChatMessage
+              key={idx}
+              type={entry.type}
+              content={entry.content}
+              query={entry.query}
+            />
+          ))}
+
+          <div ref={bottomRef} />
+        </div>
+      </div>
+
+      {/* ── Input bar ── */}
       <ChatInput onSend={handleSearch} loading={loading} />
     </div>
   )
