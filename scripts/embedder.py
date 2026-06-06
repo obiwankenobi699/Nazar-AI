@@ -1,6 +1,6 @@
 """
 scripts/embedder.py  —  Nazar AI Local Embedding Server
-FastAPI + ChromaDB + Ollama nomic-embed-text
+FastAPI + ChromaDB + SigLIP embeddings
 
 Endpoints:
   GET  /           — health check
@@ -15,8 +15,15 @@ import logging
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import chromadb, ollama, base64, io, time, uuid
+import chromadb, base64, io, time, uuid
 from PIL import Image
+import torch
+from transformers import AutoModel, AutoProcessor
+
+MODEL_NAME = "google/siglip-base-patch16-224"
+
+model = AutoModel.from_pretrained(MODEL_NAME)
+processor = AutoProcessor.from_pretrained(MODEL_NAME)
 
 app = FastAPI(title="Nazar Embedder", version="2.0.0")
 app.add_middleware(
@@ -33,26 +40,8 @@ collection = chroma.get_or_create_collection(
     metadata={"hnsw:space": "cosine"},
 )
 
-MODEL      = "nomic-embed-text"
 MAX_FRAMES = 2000
 
-def check_ollama_connection(retries: int = 5, delay: int = 3):
-    for attempt in range(1, retries + 1):
-        try:
-            # Simple test call to Ollama embeddings API
-            _ = ollama.embeddings(model=MODEL, prompt="test")["embedding"]
-            logging.info("Connected to Ollama successfully")
-            return True
-        except Exception as e:
-            logging.error(f"Failed to connect to Ollama (attempt {attempt}): {e}")
-            if attempt < retries:
-                time.sleep(delay)
-            else:
-                raise
-
-check_ollama_connection()
-
-# ── Models ────────────────────────────────────────────────────────
 class EmbedReq(BaseModel):
     imageBase64: str
     timestamp:   str
@@ -60,11 +49,11 @@ class EmbedReq(BaseModel):
     description: str = ""
 
 class SearchReq(BaseModel):
-    query:    str
+    query:    str | None = None
+    imageBase64: str | None = None
     topK:     int = 6
     cameraId: str | None = None
 
-# ── Helpers ───────────────────────────────────────────────────────
 def decode_b64(s: str) -> bytes:
     return base64.b64decode(s.split(",", 1)[1] if "," in s else s)
 
@@ -75,22 +64,27 @@ def thumb(raw: bytes, size=(128, 72)) -> str:
     img.save(buf, "JPEG", quality=55)
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
-def embed(text: str) -> list[float]:
-    return ollama.embeddings(model=MODEL, prompt=text)["embedding"]
+def embed_image(image_b64: str) -> list[float]:
+    image_data = base64.b64decode(image_b64.split(",", 1)[1] if "," in image_b64 else image_b64)
+    image = Image.open(io.BytesIO(image_data)).convert("RGB")
+    inputs = processor(images=image, return_tensors="pt")
+    with torch.no_grad():
+        embedding = model.get_image_features(**inputs)
+    embedding = embedding / embedding.norm(dim=-1, keepdim=True)
+    return embedding.squeeze().cpu().tolist()
 
-def frame_description(raw: bytes, extra: str) -> str:
-    img = Image.open(io.BytesIO(raw)).convert("RGB").resize((32, 18))
-    px  = list(img.getdata())
-    r   = sum(p[0] for p in px)/len(px)
-    g   = sum(p[1] for p in px)/len(px)
-    b   = sum(p[2] for p in px)/len(px)
-    br  = (r+g+b)/3
-    light = "bright" if br>150 else "dark" if br<80 else "dim"
-    color = "red tones" if r>g+30 and r>b+30 else \
-            "green tones" if g>r+20 and g>b+20 else \
-            "blue tones" if b>r+20 and b>g+20 else "neutral"
-    base = f"surveillance camera frame, {light}, {color}"
-    return f"{extra} {base}".strip() if extra else base
+def embed_text(text: str) -> list[float]:
+    inputs = processor(text=[text], padding=True, return_tensors="pt")
+    with torch.no_grad():
+        embedding = model.get_text_features(**inputs)
+    embedding = embedding / embedding.norm(dim=-1, keepdim=True)
+    return embedding.squeeze().cpu().tolist()
+
+import base64
+import io
+from PIL import Image
+import numpy as np
+from skimage.metrics import structural_similarity as ssim
 
 def prune():
     total = collection.count()
@@ -99,23 +93,50 @@ def prune():
         if old["ids"]:
             collection.delete(ids=old["ids"])
 
-# ── Routes ────────────────────────────────────────────────────────
+last_embedded_frame = None
+
+def is_duplicate_frame(new_frame_b64: str, threshold: float = 0.95) -> bool:
+    global last_embedded_frame
+    if last_embedded_frame is None:
+        return False
+
+    def b64_to_np(b64_str):
+        img_data = base64.b64decode(b64_str.split(",", 1)[1] if "," in b64_str else b64_str)
+        img = Image.open(io.BytesIO(img_data)).convert("L")  # grayscale
+        return np.array(img)
+
+    new_img = b64_to_np(new_frame_b64)
+    last_img = b64_to_np(last_embedded_frame)
+
+    score = ssim(new_img, last_img)
+    return score > threshold
+
+def update_last_embedded_frame(frame_b64: str):
+    global last_embedded_frame
+    last_embedded_frame = frame_b64
+
 @app.get("/")
 def root():
-    return {"ok": True, "model": MODEL, "frames": collection.count()}
+    return {"ok": True, "model": MODEL_NAME, "frames": collection.count()}
 
 @app.get("/stats")
 def stats():
-    return {"total_frames": collection.count(), "model": MODEL, "collection": "nazar_frames"}
+    return {"total_frames": collection.count(), "model": MODEL_NAME, "collection": "nazar_frames"}
 
 @app.post("/embed")
 def embed_frame(req: EmbedReq):
-    try:    raw = decode_b64(req.imageBase64)
-    except: raise HTTPException(400, "Invalid image")
-    desc = frame_description(raw, req.description)
-    try:    vec = embed(desc)
+    try:
+        raw = decode_b64(req.imageBase64)
+    except:
+        raise HTTPException(400, "Invalid image")
+    desc = req.description or "No description"
+    # Check for duplicate frame
+    if is_duplicate_frame(req.imageBase64):
+        return {"id": None, "stored": False, "reason": "Duplicate frame skipped", "total": collection.count()}
+    try:
+        vec = embed_image(req.imageBase64)
     except Exception as e:
-        raise HTTPException(500, f"Ollama error: {e}")
+        raise HTTPException(500, f"SigLIP error: {e}")
     fid = str(uuid.uuid4())
     collection.add(
         ids=[fid], embeddings=[vec], documents=[desc],
@@ -125,19 +146,26 @@ def embed_frame(req: EmbedReq):
             "created_at": int(time.time()),
         }],
     )
+    update_last_embedded_frame(req.imageBase64)
     prune()
     return {"id": fid, "stored": True, "total": collection.count()}
 
 @app.post("/search")
 def search(req: SearchReq):
-    if not req.query.strip():
-        raise HTTPException(400, "Empty query")
+    if not req.query and not req.imageBase64:
+        raise HTTPException(400, "Provide either query or imageBase64")
     total = collection.count()
     if total == 0:
-        return {"results": [], "query": req.query, "total_searched": 0}
-    try:    qvec = embed(req.query)
+        print("Search: No frames in DB")
+        return {"found": False, "message": "No relevant footage found.", "query": req.query, "total_searched": 0}
+    try:
+        if req.imageBase64:
+            qvec = embed_image(req.imageBase64)
+        else:
+            qvec = embed_text(req.query)
     except Exception as e:
-        raise HTTPException(500, f"Ollama error: {e}")
+        print(f"Search embedding error: {e}")
+        raise HTTPException(500, f"SigLIP error: {e}")
     where = {"camera_id": req.cameraId} if req.cameraId else None
     res = collection.query(
         query_embeddings=[qvec],
@@ -145,18 +173,47 @@ def search(req: SearchReq):
         include=["metadatas", "distances", "documents"],
         where=where,
     )
-    out = []
-    for i, rid in enumerate(res["ids"][0]):
+    print(f"Search query: {req.query or '[image]'}")
+    print(f"Results found: {len(res['ids'][0])}")
+    print("Distances:", res["distances"][0])
+
+    # Gap detection to find largest jump in distances
+    distances = res["distances"][0]
+    if len(distances) == 0:
+        print("Search: No results found")
+        return {"found": False, "message": "No relevant footage found.", "query": req.query, "total_searched": total}
+
+    sorted_indices = sorted(range(len(distances)), key=lambda i: distances[i])
+    sorted_distances = [distances[i] for i in sorted_indices]
+
+    gap = 0
+    gap_idx = len(sorted_distances)
+    for i in range(1, len(sorted_distances)):
+        diff = sorted_distances[i] - sorted_distances[i-1]
+        if diff > gap:
+            gap = diff
+            gap_idx = i
+
+    keep_indices = sorted_indices[:gap_idx]
+
+    filtered = []
+    for i in keep_indices:
         m = res["metadatas"][0][i]
-        out.append({
-            "id": rid,
-            "timestamp":   m.get("timestamp", ""),
-            "cameraId":    m.get("camera_id", ""),
+        filtered.append({
+            "id": res["ids"][0][i],
+            "timestamp": m.get("timestamp", ""),
+            "cameraId": m.get("camera_id", ""),
             "description": m.get("description", res["documents"][0][i]),
-            "distance":    round(res["distances"][0][i], 4),
+            "distance": round(distances[i], 4),
             "thumbBase64": m.get("thumb", ""),
         })
-    return {"results": out, "query": req.query, "total_searched": total}
+
+    if not filtered:
+        print("Search: No results passed gap detection")
+        return {"found": False, "message": "No relevant footage found.", "query": req.query, "total_searched": total}
+
+    print(f"Search: {len(filtered)} results returned after gap detection")
+    return {"found": True, "results": filtered, "query": req.query, "total_searched": total}
 
 @app.delete("/clear")
 def clear():

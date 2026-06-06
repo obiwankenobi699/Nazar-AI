@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import TimestampList from "@/components/timestamp-list"
 import ChatInterface from "@/components/chat-interface"
-import { Timeline } from "../../components/Timeline"
+import { Timeline } from "@/components/Timeline"
 import type { Timestamp } from "@/app/types"
 import { detectEvents, type VideoEvent, type TensorFlowData } from "./actions"
 

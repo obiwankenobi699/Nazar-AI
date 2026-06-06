@@ -16,6 +16,7 @@ interface ChatMessageProps {
   type: "query" | "result" | "error" | "loading"
   content: string | Result[]
   query?: string
+  imageBase64?: string
 }
 
 const matchBadge = (d: number) => {
@@ -24,7 +25,6 @@ const matchBadge = (d: number) => {
   return { label: "Weak", cls: "text-red-400 bg-red-400/8 border-red-400/15" }
 }
 
-/* ── Typing dots ── */
 function Dots() {
   return (
     <div className="flex gap-1 items-center h-5">
@@ -39,7 +39,6 @@ function Dots() {
   )
 }
 
-/* ── Small AI logo mark ── */
 function AIMark() {
   return (
     <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0 shadow-lg shadow-violet-900/30">
@@ -48,10 +47,26 @@ function AIMark() {
   )
 }
 
-export function ChatMessage({ type, content, query }: ChatMessageProps) {
+export function ChatMessage({ type, content, query, imageBase64 }: ChatMessageProps) {
 
   /* ── User query ── */
   if (type === "query") {
+    if (imageBase64) {
+      return (
+        <div className="flex justify-end">
+          <div className="max-w-[75%] bg-white/[0.07] rounded-2xl rounded-br-md overflow-hidden border border-white/[0.09]">
+            <img
+              src={imageBase64}
+              alt="Image search"
+              className="w-full max-h-48 object-cover"
+            />
+            <p className="text-xs text-white/30 px-3 py-1.5 text-right tracking-wide">
+              image search
+            </p>
+          </div>
+        </div>
+      )
+    }
     return (
       <div className="flex justify-end">
         <div className="max-w-[75%] bg-white/[0.07] text-white/90 text-sm leading-relaxed px-4 py-2.5 rounded-2xl rounded-br-md">
@@ -103,20 +118,19 @@ export function ChatMessage({ type, content, query }: ChatMessageProps) {
       <div className="flex items-start gap-3">
         <AIMark />
         <div className="flex-1 min-w-0">
-          {/* Summary line — like Claude's response text */}
           <p className="text-sm text-white/50 mb-4 leading-relaxed">
             Found{" "}
             <span className="text-white/80 font-medium">{content.length}</span>{" "}
             {content.length === 1 ? "frame" : "frames"} matching{" "}
-            <span className="text-violet-400">"{query}"</span>
+            {query === "[image search]"
+              ? <span className="text-violet-400">uploaded image</span>
+              : <span className="text-violet-400">"{query}"</span>
+            }
           </p>
 
-          {/* Result cards */}
           <div className="flex flex-col gap-2">
             {content.map((r) => {
               const badge = matchBadge(r.distance)
-
-              // Parse timestamp safely
               const ts = r.timestamp ? new Date(r.timestamp) : null
               const timeStr =
                 ts && !isNaN(ts.getTime())
@@ -128,7 +142,6 @@ export function ChatMessage({ type, content, query }: ChatMessageProps) {
                   key={r.id}
                   className="group flex gap-3.5 p-3 rounded-xl border border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06] hover:border-white/[0.12] transition-all duration-200 cursor-pointer"
                 >
-                  {/* Thumbnail */}
                   <div className="flex-shrink-0 w-32 aspect-video rounded-lg overflow-hidden bg-white/5">
                     {r.thumbBase64 ? (
                       <img
@@ -143,23 +156,19 @@ export function ChatMessage({ type, content, query }: ChatMessageProps) {
                     )}
                   </div>
 
-                  {/* Meta */}
                   <div className="flex flex-col flex-1 min-w-0 justify-between py-0.5">
-                    {/* Camera + time */}
                     <div className="flex items-center gap-2 text-xs font-mono text-white/30 mb-2">
                       <Clock className="w-3 h-3" />
                       <span>{timeStr}</span>
                       <span className="text-violet-400/70">{r.cameraId}</span>
                     </div>
 
-                    {/* Description */}
                     {r.description && (
                       <p className="text-xs text-white/60 leading-relaxed line-clamp-2 mb-3">
                         {r.description}
                       </p>
                     )}
 
-                    {/* Badge + score */}
                     <div className="flex items-center justify-between">
                       <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full border ${badge.cls}`}>
                         {badge.label} match

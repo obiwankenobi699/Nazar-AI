@@ -18,6 +18,7 @@ interface ChatEntry {
   type: "query" | "result" | "error" | "loading"
   content: string | Result[]
   query?: string
+  imageBase64?: string
 }
 
 const EXAMPLE_QUERIES = [
@@ -29,54 +30,92 @@ const EXAMPLE_QUERIES = [
 ]
 
 export default function SearchPage() {
+  const [query,       setQuery]      = useState("")
+  const [loading,     setLoading]    = useState(false)
+  const [stats,       setStats]      = useState<{ total_frames: number; model: string } | null>(null)
+  const [clearing,    setClearing]   = useState(false)
   const [chatHistory, setChatHistory] = useState<ChatEntry[]>([])
-  const [loading, setLoading] = useState(false)
-  const [stats, setStats] = useState<{ total_frames: number; model: string } | null>(null)
-  const [clearing, setClearing] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const fetchStats = () => {
     fetch("/api/search")
-      .then((r) => r.json())
-      .then((d) => { if (!d.error) setStats(d) })
+      .then(r => r.json())
+      .then(d => { if (!d.error) setStats(d) })
       .catch(() => {})
   }
 
-  useEffect(() => { fetchStats() }, [])
+  useEffect(() => {
+    fetchStats()
+  }, [])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [chatHistory])
 
-  const handleSearch = async (query: string) => {
-    if (!query.trim()) return
-    setChatHistory((prev) => [...prev, { type: "query", content: query }])
+  const pushResults = (data: any, queryLabel: string) => {
+    setChatHistory(prev => prev.filter(e => e.type !== "loading"))
+    const hits: Result[] = data.results ?? []
+    if (!hits.length) {
+      setChatHistory(prev => [...prev, { type: "error", content: "No matching frames found." }])
+    } else {
+      setChatHistory(prev => [...prev, { type: "result", content: hits, query: queryLabel }])
+    }
+  }
+
+  const pushError = (msg: string) => {
+    setChatHistory(prev => prev.filter(e => e.type !== "loading"))
+    setChatHistory(prev => [...prev, { type: "error", content: msg }])
+  }
+
+  /* ── Text search ── */
+  const handleSearch = async (q?: string) => {
+    const finalQuery = (q ?? query).trim()
+    if (!finalQuery) return
+    if (q) setQuery(q)
+
+    setChatHistory(prev => [...prev, { type: "query", content: finalQuery }])
+    setChatHistory(prev => [...prev, { type: "loading", content: "" }])
     setLoading(true)
-    setChatHistory((prev) => [...prev, { type: "loading", content: "" }])
+
     try {
       const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query, topK: 9 }),
+        body: JSON.stringify({ query: finalQuery, topK: 9 }),
       })
       const data = await res.json()
-      setChatHistory((prev) => {
-        const withoutLoading = prev.filter((e) => e.type !== "loading")
-        if (!res.ok) return [...withoutLoading, { type: "error", content: data.error || "Search failed" }]
-        if (!data.results?.length) return [...withoutLoading, { type: "error", content: "No matching frames found." }]
-        return [...withoutLoading, { type: "result", content: data.results, query }]
-      })
+      if (!res.ok) { pushError(data.error || "Search failed"); return }
+      pushResults(data, finalQuery)
     } catch {
-      setChatHistory((prev) => {
-        const withoutLoading = prev.filter((e) => e.type !== "loading")
-        return [...withoutLoading, { type: "error", content: "Search failed — is the embedder running?" }]
-      })
+      pushError("Search failed — is the embedder running?")
     } finally {
       setLoading(false)
-      fetchStats()
     }
   }
 
+  /* ── Image search ── */
+  const handleImageSearch = async (base64: string) => {
+    setChatHistory(prev => [...prev, { type: "query", content: "[image search]", imageBase64: base64 }])
+    setChatHistory(prev => [...prev, { type: "loading", content: "" }])
+    setLoading(true)
+
+    try {
+      const res = await fetch("/api/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: base64, topK: 9 }),
+      })
+      const data = await res.json()
+      if (!res.ok) { pushError(data.error || "Search failed"); return }
+      pushResults(data, "[image search]")
+    } catch {
+      pushError("Search failed — is the embedder running?")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /* ── Clear ── */
   const handleClear = async () => {
     if (!confirm("Clear all indexed frames?")) return
     setClearing(true)
@@ -85,7 +124,7 @@ export default function SearchPage() {
       setChatHistory([])
       fetchStats()
     } catch {
-      setChatHistory((prev) => [...prev, { type: "error", content: "Could not clear" }])
+      pushError("Could not clear")
     } finally {
       setClearing(false)
     }
@@ -94,7 +133,7 @@ export default function SearchPage() {
   return (
     <div className="flex flex-col h-screen bg-[#0f0f0f] text-white">
 
-      {/* ── Slim top bar ── */}
+      {/* Top bar */}
       <div className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 border-b border-white/[0.06]">
         <div className="flex items-center gap-2.5">
           <span className="text-sm font-semibold text-white/90 tracking-tight">Footage Search</span>
@@ -123,11 +162,11 @@ export default function SearchPage() {
         </div>
       </div>
 
-      {/* ── Scrollable message area ── */}
+      {/* Message area */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto px-4 py-8 flex flex-col gap-8">
 
-          {/* Empty / welcome state */}
+          {/* Welcome state */}
           {chatHistory.length === 0 && (
             <div className="flex flex-col items-center justify-center min-h-[55vh] gap-8 text-center">
               <div>
@@ -135,7 +174,7 @@ export default function SearchPage() {
                   What are you looking for?
                 </p>
                 <p className="text-sm text-white/30 max-w-xs mx-auto leading-relaxed">
-                  Describe a scene or behaviour — AI will find matching frames from your footage.
+                  Describe a scene or behaviour, or upload an image — AI will find matching frames from your footage.
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 justify-center">
@@ -159,6 +198,7 @@ export default function SearchPage() {
               type={entry.type}
               content={entry.content}
               query={entry.query}
+              imageBase64={entry.imageBase64}
             />
           ))}
 
@@ -166,8 +206,12 @@ export default function SearchPage() {
         </div>
       </div>
 
-      {/* ── Input bar ── */}
-      <ChatInput onSend={handleSearch} loading={loading} />
+      {/* Input */}
+      <ChatInput
+        onSend={handleSearch}
+        onSendImage={handleImageSearch}
+        loading={loading}
+      />
     </div>
   )
 }
